@@ -1,0 +1,1087 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>RAVENHOLM</title>
+<style>
+  html,body{margin:0;padding:0;background:#000;overflow:hidden;height:100%;font-family:"Courier New",monospace;}
+  #c{display:block;width:100%;height:100%;}
+  #hud{position:fixed;inset:0;pointer-events:none;z-index:5;}
+  #crosshair{position:absolute;left:50%;top:50%;width:14px;height:14px;transform:translate(-50%,-50%);}
+  #crosshair:before,#crosshair:after{content:"";position:absolute;background:#e8d9b0;opacity:.85;}
+  #crosshair:before{left:6px;top:0;width:2px;height:14px;}
+  #crosshair:after{left:0;top:6px;width:14px;height:2px;}
+  .panel{position:absolute;color:#e8d9b0;text-shadow:0 0 6px #000,0 2px 2px #000;}
+  #vitals{left:22px;bottom:20px;font-size:13px;letter-spacing:1px;}
+  .barwrap{width:210px;height:13px;background:#14100b;border:1px solid #5a4a30;margin-top:5px;position:relative;}
+  .bar{height:100%;transition:width .15s;}
+  #hpbar{background:linear-gradient(90deg,#7a1f14,#c8452a);width:100%;}
+  #absbar{background:linear-gradient(90deg,#1d5f6e,#4fd8e8);width:100%;}
+  .blabel{font-size:10px;color:#a08c62;letter-spacing:2px;margin-top:7px;}
+  #ammo{right:26px;bottom:20px;text-align:right;}
+  #wname{font-size:12px;letter-spacing:3px;color:#c8b282;}
+  #wcount{font-size:30px;color:#f0e2bc;text-shadow:0 0 8px rgba(255,160,60,.35);}
+  #wmode{font-size:10px;color:#8a7648;letter-spacing:2px;}
+  #objective{left:50%;top:26px;transform:translateX(-50%);font-size:13px;letter-spacing:2px;color:#e8cf9a;background:rgba(10,8,5,.55);border:1px solid #4a3c22;padding:7px 18px;max-width:72%;text-align:center;}
+  #subtitle{left:50%;bottom:110px;transform:translateX(-50%);font-size:15px;color:#f5ecd2;background:rgba(8,6,4,.72);padding:8px 20px;max-width:70%;text-align:center;display:none;border-left:3px solid #8a5a2a;}
+  #subtitle b{color:#e89a4a;letter-spacing:1px;}
+  #hint{left:50%;bottom:66px;transform:translateX(-50%);font-size:12px;color:#b8a878;letter-spacing:1px;display:none;text-shadow:0 1px 2px #000;}
+  #wave{right:26px;top:24px;font-size:12px;color:#d88a4a;letter-spacing:2px;display:none;}
+  #dmgvin{position:absolute;inset:0;background:radial-gradient(ellipse at center,transparent 55%,rgba(150,20,8,.55) 100%);opacity:0;transition:opacity .1s;}
+  #zapvin{position:absolute;inset:0;background:radial-gradient(ellipse at center,transparent 60%,rgba(60,200,230,.4) 100%);opacity:0;transition:opacity .1s;}
+  #fade{position:fixed;inset:0;background:#000;opacity:1;transition:opacity 1.2s;z-index:40;pointer-events:none;}
+  .screen{position:fixed;inset:0;z-index:30;display:flex;flex-direction:column;align-items:center;justify-content:center;background:radial-gradient(ellipse at 50% 35%,#241208 0%,#0a0603 70%);color:#e8d9b0;text-align:center;}
+  .screen h1{font-size:52px;letter-spacing:14px;margin:0 0 6px;color:#f0d9a0;text-shadow:0 0 24px rgba(255,140,40,.4),0 0 4px #000;font-weight:normal;}
+  .screen h2{font-size:13px;letter-spacing:6px;color:#a0724a;margin:0 0 34px;font-weight:normal;}
+  .screen p{font-size:13px;line-height:1.9;color:#c8b288;max-width:560px;margin:6px 0;}
+  .screen .go{margin-top:30px;font-size:15px;letter-spacing:4px;color:#f0d9a0;border:1px solid #6a5228;padding:12px 34px;cursor:pointer;background:rgba(40,24,10,.5);animation:pulse 2s infinite;}
+  @keyframes pulse{0%,100%{box-shadow:0 0 0 rgba(255,150,50,0);}50%{box-shadow:0 0 22px rgba(255,150,50,.45);}}
+  .kbd{display:inline-block;border:1px solid #6a5a38;padding:0 6px;margin:0 2px;font-size:11px;color:#e0cf9f;background:#1a140a;}
+  #lcard{display:none;}
+  #lcard h1{font-size:38px;}
+  #endcard{display:none;}
+  #choice{display:none;}
+  .cbtn{pointer-events:auto;cursor:pointer;border:1px solid #6a5228;background:rgba(30,20,8,.85);color:#e8d9b0;font-size:14px;letter-spacing:3px;padding:14px 30px;margin:9px;width:340px;}
+  .cbtn:hover{background:rgba(90,50,16,.9);box-shadow:0 0 18px rgba(255,140,40,.35);}
+  .cbtn small{display:block;font-size:10px;color:#a08858;letter-spacing:1px;margin-top:5px;}
+  #loadnote{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;color:#8a7248;font-size:13px;letter-spacing:4px;z-index:50;background:#000;}
+#endt{font-size:clamp(24px,5.2vw,50px);line-height:1.15;}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="fade"></div>
+<div id="hud">
+  <div id="crosshair"></div>
+  <div id="dmgvin"></div><div id="zapvin"></div>
+  <div id="vitals" class="panel">
+    <div class="blabel">VITALS</div><div class="barwrap"><div class="bar" id="hpbar"></div></div>
+    <div class="blabel">ABSORPTION</div><div class="barwrap"><div class="bar" id="absbar"></div></div>
+  </div>
+  <div id="ammo" class="panel"><div id="wname">MAGNET GUN</div><div id="wcount">--</div><div id="wmode">ATTRACT</div></div>
+  <div id="objective" class="panel"></div>
+  <div id="subtitle" class="panel"></div>
+  <div id="hint" class="panel"></div>
+  <div id="wave" class="panel"></div>
+</div>
+<div id="title" class="screen">
+  <h1>RAVENHOLM</h1>
+  <h2>WE DON'T GO THERE ANYMORE</h2>
+  <p>You are <b>ADRIAN SHEPARD</b>, HECU. Pulled from stasis into the town no one returns from. Father Grigori survived, and what he is becoming in that hospital on the hill may be worse than what walks the streets.</p>
+  <p><span class="kbd">WASD</span> move <span class="kbd">MOUSE</span> look <span class="kbd">LMB</span> fire <span class="kbd">RMB</span> alt / buttstroke <span class="kbd">1</span><span class="kbd">2</span><span class="kbd">3</span> weapons <span class="kbd">E</span> interact <span class="kbd">SPACE</span> jump <span class="kbd">SHIFT</span> sprint</p>
+  <div class="go" id="startbtn">ENTER RAVENHOLM</div>
+</div>
+<div id="lcard" class="screen"><h2 id="lact"></h2><h1 id="lname"></h1><p id="ldesc"></p><div class="go" id="lgo">BEGIN</div></div>
+<div id="choice" class="screen"><h2>THE MINISTER</h2><p id="choicetext"></p>
+  <div class="cbtn" id="bcure">CURE HIM<small> synthesize the antidote - the man deserves an ending</small></div>
+  <div class="cbtn" id="bcontain">CONTAIN HIM<small> power the containment cell - alive, but caged</small></div>
+  <div class="cbtn" id="bkill">END IT<small> a marine's mercy - finish what the venom started</small></div>
+</div>
+<div id="endcard" class="screen"><h2 id="endk"></h2><h1 id="endt"></h1><p id="endp"></p><div class="go" id="endgo">PLAY AGAIN</div></div>
+<div id="deadcard" class="screen" style="display:none"><h1 style="color:#c8452a">YOU DIED</h1><p>The town keeps its own.</p><div class="go" id="retry">TRY AGAIN</div></div>
+<div id="loadnote">LIGHTING THE CANDLES...</div>
+<script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.160.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.160.0/examples/jsm/"}}</script>
+<script>window.addEventListener("error",e=>{var n=document.getElementById("loadnote");if(n){n.style.display="flex";n.textContent="ERR: "+(e.message||e.type)+" @ "+(e.lineno||"");}});</script>
+<script type="module">
+import * as THREE from 'three';
+
+// ============================================================ CORE STATE
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({canvas, antialias:true, powerPreference:'high-performance'});
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.15;
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(74, innerWidth/innerHeight, .05, 300);
+addEventListener('resize', ()=>{ camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth,innerHeight); });
+
+const world = new THREE.Group(); scene.add(world);
+const fxGroup = new THREE.Group(); scene.add(fxGroup);
+
+const G = {
+  state:'title', levelIndex:0, hp:100, absorb:100, time:0,
+  keys:{}, yaw:0, pitch:0, locked:false,
+  weapon:0, weapons:[],
+};
+const PLAYER = { pos:new THREE.Vector3(0,0,10), vel:new THREE.Vector3(), radius:.38, height:1.7, eye:1.62, onGround:false, speed:5.4, sprint:8.2 };
+const qs = new URLSearchParams(location.search);
+const QA = qs.has('qa');
+
+const statics = [];   // {min,max,metal,cond,name}
+const props = [];     // dynamic physics props
+let enemies=[], nails=[], arcs=[], traps=[], pickups=[], inters=[], npcs=[], charms=[];
+let levelDef=null, levelTime=0;
+
+function addStatic(x,y,z,w,h,d,opt={}){ const b={min:new THREE.Vector3(x-w/2,y,z-d/2),max:new THREE.Vector3(x+w/2,y+h,z+d/2),metal:!!opt.metal,cond:!!opt.cond,name:opt.name||''}; statics.push(b); return b; }
+
+// ============================================================ INPUT
+addEventListener('keydown',e=>{ G.keys[e.code]=true; if(e.code.startsWith('Digit')) selectWeapon(+e.code.slice(5)-1); if(e.code==='KeyE') tryInteract(); });
+addEventListener('keyup',e=>G.keys[e.code]=false);
+document.addEventListener('pointerlockchange',()=>{ G.locked = document.pointerLockElement===canvas; });
+canvas.addEventListener('click',()=>{ if(G.state==='play' && !G.locked && !QA) canvas.requestPointerLock(); });
+addEventListener('mousemove',e=>{ if(G.locked){ G.yaw -= e.movementX*.0021; G.pitch = Math.max(-1.45,Math.min(1.45,G.pitch - e.movementY*.0021)); }});
+let firing=false, altHeld=false;
+addEventListener('mousedown',e=>{ if(!G.locked && !QA) return; if(e.button===0) firing=true; if(e.button===2){altHeld=true; altFire();} });
+addEventListener('mouseup',e=>{ if(e.button===0) firing=false; if(e.button===2) altHeld=false; });
+addEventListener('contextmenu',e=>e.preventDefault());
+
+// ============================================================ AUDIO (synth)
+let AC=null, droneOn=false;
+function audio(){ if(!AC) AC=new (window.AudioContext||window.webkitAudioContext)(); return AC; }
+function drone(){
+  if(droneOn||QA) return; droneOn=true;
+  try{ const ac=audio();
+    const o1=ac.createOscillator(), o2=ac.createOscillator(), g=ac.createGain(), f=ac.createBiquadFilter();
+    o1.type='sawtooth'; o1.frequency.value=38; o2.type='sawtooth'; o2.frequency.value=38.7;
+    f.type='lowpass'; f.frequency.value=140; g.gain.value=.045;
+    o1.connect(f); o2.connect(f); f.connect(g); g.connect(ac.destination);
+    o1.start(); o2.start();
+    const lfo=ac.createOscillator(), lg=ac.createGain(); lfo.frequency.value=.07; lg.gain.value=.02;
+    lfo.connect(lg); lg.connect(g.gain); lfo.start();
+  }catch(e){}
+}
+let groanT=8;
+function ambientStep(dt){ groanT-=dt; if(groanT<=0){ groanT=9+Math.random()*14; sfx('groan'); } }
+function sfx(kind){
+  if(QA) return;
+  try{ const ac=audio(), t=ac.currentTime;
+  const o=ac.createOscillator(), g=ac.createGain(); o.connect(g); g.connect(ac.destination);
+  if(kind==='magnet'){ o.type='sawtooth'; o.frequency.setValueAtTime(180,t); o.frequency.exponentialRampToValueAtTime(60,t+.3); g.gain.setValueAtTime(.16,t); g.gain.exponentialRampToValueAtTime(.001,t+.35); o.start(t); o.stop(t+.35); }
+  else if(kind==='nail'){ o.type='square'; o.frequency.setValueAtTime(900,t); o.frequency.exponentialRampToValueAtTime(200,t+.08); g.gain.setValueAtTime(.1,t); g.gain.exponentialRampToValueAtTime(.001,t+.1); o.start(t); o.stop(t+.1); }
+  else if(kind==='shot'){ o.type='square'; o.frequency.setValueAtTime(120,t); g.gain.setValueAtTime(.3,t); g.gain.exponentialRampToValueAtTime(.001,t+.18); o.start(t); o.stop(t+.18); }
+  else if(kind==='melee'){ o.type='triangle'; o.frequency.setValueAtTime(90,t); g.gain.setValueAtTime(.2,t); g.gain.exponentialRampToValueAtTime(.001,t+.12); o.start(t); o.stop(t+.12); }
+  else if(kind==='zap'){ o.type='sawtooth'; o.frequency.setValueAtTime(60,t); o.frequency.linearRampToValueAtTime(2400,t+.05); g.gain.setValueAtTime(.12,t); g.gain.exponentialRampToValueAtTime(.001,t+.12); o.start(t); o.stop(t+.12); }
+  else if(kind==='hit'){ o.type='triangle'; o.frequency.setValueAtTime(220,t); o.frequency.exponentialRampToValueAtTime(70,t+.1); g.gain.setValueAtTime(.14,t); g.gain.exponentialRampToValueAtTime(.001,t+.12); o.start(t); o.stop(t+.12); }
+  else if(kind==='pickup'){ o.type='sine'; o.frequency.setValueAtTime(520,t); o.frequency.setValueAtTime(780,t+.09); g.gain.setValueAtTime(.12,t); g.gain.exponentialRampToValueAtTime(.001,t+.25); o.start(t); o.stop(t+.25); }
+  else if(kind==='groan'){ o.type='sawtooth'; o.frequency.setValueAtTime(70+Math.random()*50,t); o.frequency.linearRampToValueAtTime(45,t+.5); g.gain.setValueAtTime(.05,t); g.gain.linearRampToValueAtTime(.001,t+.55); o.start(t); o.stop(t+.55); }
+  else if(kind==='step'){ o.type='triangle'; o.frequency.setValueAtTime(70+Math.random()*30,t); g.gain.setValueAtTime(.05,t); g.gain.exponentialRampToValueAtTime(.001,t+.07); o.start(t); o.stop(t+.07); }
+  }catch(e){}
+}
+
+// ============================================================ MATERIALS / GEO HELPERS
+function texCanvas(fn){ const c=document.createElement('canvas'); c.width=c.height=128; const x=c.getContext('2d'); fn(x); const t=new THREE.CanvasTexture(c); t.wrapS=t.wrapT=THREE.RepeatWrapping; return t; }
+let tr=4242; function rnd(){ tr=(tr*1664525+1013904223)>>>0; return tr/4294967296; }
+function grimeTex(streaks){ return texCanvas(x=>{ x.fillStyle='#cfcfcf'; x.fillRect(0,0,128,128);
+  for(let i=0;i<600;i++){ const g=140+rnd()*115|0; x.fillStyle='rgb('+g+','+g+','+g+')'; x.fillRect(rnd()*128,rnd()*128,1+rnd()*2,1+rnd()*3); }
+  for(let i=0;i<8;i++){ const g=90+rnd()*60|0; x.fillStyle='rgba('+g+','+g+','+g+',.25)'; x.beginPath(); x.arc(rnd()*128,rnd()*128,6+rnd()*22,0,7); x.fill(); }
+  if(streaks) for(let i=0;i<12;i++){ const sx=rnd()*128, w=2+rnd()*7, l=24+rnd()*90; x.fillStyle='rgba(42,38,32,'+(.1+rnd()*.22)+')'; x.fillRect(sx,0,w,l); }
+}); }
+function plankTex(){ return texCanvas(x=>{ x.fillStyle='#c4c4c4'; x.fillRect(0,0,128,128);
+  for(let p=0;p<4;p++){ const y0=p*32; for(let i=0;i<60;i++){ const g=120+rnd()*120|0; x.fillStyle='rgba('+g+','+g+','+g+',.5)'; x.fillRect(0,y0+rnd()*30,128,1); }
+    x.fillStyle='rgba(30,26,22,.8)'; x.fillRect(0,y0+30,128,2); x.fillRect(rnd()*128,y0,2,32); }
+}); }
+function rustTex(){ return texCanvas(x=>{ x.fillStyle='#c8c8c8'; x.fillRect(0,0,128,128);
+  for(let i=0;i<26;i++){ x.fillStyle='rgba(110,60,25,'+(.15+rnd()*.4)+')'; x.beginPath(); x.arc(rnd()*128,rnd()*128,3+rnd()*16,0,7); x.fill(); }
+  for(let i=0;i<300;i++){ const g=120+rnd()*120|0; x.fillStyle='rgba('+g+','+g+','+g+',.4)'; x.fillRect(rnd()*128,rnd()*128,1+rnd()*2,1+rnd()*2); }
+}); }
+const MAT = {
+  stone: new THREE.MeshStandardMaterial({color:0x6b6258, roughness:.95}),
+  stoneD: new THREE.MeshStandardMaterial({color:0x4a443c, roughness:.95}),
+  plaster: new THREE.MeshStandardMaterial({color:0x8a7f6a, roughness:.9}),
+  plasterG: new THREE.MeshStandardMaterial({color:0x5a6b58, roughness:.9}),
+  rust: new THREE.MeshStandardMaterial({color:0x6e3b1e, roughness:.7, metalness:.55}),
+  metal: new THREE.MeshStandardMaterial({color:0x707880, roughness:.4, metalness:.85}),
+  metalD: new THREE.MeshStandardMaterial({color:0x3a3f45, roughness:.5, metalness:.8}),
+  wood: new THREE.MeshStandardMaterial({color:0x5a4026, roughness:.9}),
+  woodD: new THREE.MeshStandardMaterial({color:0x3a2a18, roughness:.9}),
+  flesh: new THREE.MeshStandardMaterial({color:0x9a7a5a, roughness:.85}),
+  rot: new THREE.MeshStandardMaterial({color:0x6b5a3a, roughness:.9}),
+  rotDark: new THREE.MeshStandardMaterial({color:0x4a3f28, roughness:.9}),
+  grig: new THREE.MeshStandardMaterial({color:0x3a3230, roughness:.9}),
+  crab: new THREE.MeshStandardMaterial({color:0xb08850, roughness:.8}),
+  acid: new THREE.MeshStandardMaterial({color:0x7a9a3a, roughness:.7, emissive:0x2a4a0a, emissiveIntensity:.4}),
+  elec: new THREE.MeshStandardMaterial({color:0x4a6a7a, roughness:.6, emissive:0x2288cc, emissiveIntensity:.8}),
+  candle: new THREE.MeshStandardMaterial({color:0xf0e0c0, emissive:0xffa040, emissiveIntensity:2.2}),
+  _texdone:null,
+  greenlamp: new THREE.MeshStandardMaterial({color:0xc0ffc0, emissive:0x40ff70, emissiveIntensity:1.6}),
+  black: new THREE.MeshStandardMaterial({color:0x0a0a0a, roughness:1}),
+  blood: new THREE.MeshStandardMaterial({color:0x5a1008, roughness:.85}),
+  _x:0,
+  white: new THREE.MeshStandardMaterial({color:0xc8c4bc, roughness:.8}),
+  water: new THREE.MeshStandardMaterial({color:0x1a3a30, roughness:.15, metalness:.3, transparent:true, opacity:.75}),
+};
+MAT.stone.map=grimeTex(1); MAT.stoneD.map=grimeTex(1); MAT.plaster.map=grimeTex(1); MAT.plasterG.map=grimeTex(1);
+MAT.wood.map=plankTex(); MAT.woodD.map=plankTex(); MAT.rust.map=rustTex(); MAT.metalD.map=grimeTex(0);
+
+const BOXG = new THREE.BoxGeometry(1,1,1);
+function box(x,y,z,w,h,d,mat,parent=world){ const m=new THREE.Mesh(BOXG,mat); m.position.set(x,y+h/2,z); m.scale.set(w,h,d); parent.add(m); return m; }
+function solidBox(x,y,z,w,h,d,mat,opt={}){ const m=box(x,y,z,w,h,d,mat); addStatic(x,y,z,w,h,d,opt); return m; }
+
+function addProp(mesh, half, mass, metal, pos, cond=false){
+  mesh.position.copy(pos);
+  const p={mesh, half:half.clone(), vel:new THREE.Vector3(), ang:new THREE.Vector3(), mass, metal, cond, pos:mesh.position, stuck:0, stuckTo:null, held:false};
+  props.push(p); return p;
+}
+function mkBarrel(x,y,z){ const m=new THREE.Mesh(new THREE.CylinderGeometry(.34,.34,.95,9), MAT.rust); world.add(m); return addProp(m,new THREE.Vector3(.34,.48,.34),22,true,new THREE.Vector3(x,y+.48,z),true); }
+function mkFridge(x,y,z){ const g=new THREE.Group(); const b=box(0,0,0,1.1,1.9,.9,MAT.metal,g); b.position.set(0,.95,0); const door=box(0,0,0,.06,1.7,.8,MAT.metalD,g); door.position.set(.56,.95,0); world.add(g); return addProp(g,new THREE.Vector3(.6,.95,.5),85,true,new THREE.Vector3(x,y+.95,z),true); }
+function mkSawblade(x,y,z){ const m=new THREE.Mesh(new THREE.CylinderGeometry(.55,.55,.06,14), MAT.metal); world.add(m); return addProp(m,new THREE.Vector3(.55,.05,.55),12,true,new THREE.Vector3(x,y+.4,z),true); }
+function mkCart(x,y,z){ const g=new THREE.Group(); const bed=box(0,0,0,1.5,.08,.7,MAT.metal,g); bed.position.y=.6; for(const [sx,sz] of [[-.6,-.25],[.6,-.25],[-.6,.25],[.6,.25]]){ const w2=new THREE.Mesh(new THREE.CylinderGeometry(.12,.12,.06,8),MAT.black); w2.rotation.z=Math.PI/2; w2.position.set(sx,.12,sz); g.add(w2);} const leg=box(0,0,0,1.3,.5,.5,MAT.metalD,g); leg.position.y=.35; world.add(g); return addProp(g,new THREE.Vector3(.75,.35,.35),30,true,new THREE.Vector3(x,y+.4,z),true); }
+function mkIBeam(x,y,z,long=4){ const g=new THREE.Group(); const b=box(0,0,0,.3,.3,long,MAT.rust,g); world.add(g); return addProp(g,new THREE.Vector3(.18,.18,long/2),60,true,new THREE.Vector3(x,y+.4,z),true); }
+function mkChair(x,y,z){ const g=new THREE.Group(); const s=box(0,0,0,.45,.05,.45,MAT.wood,g); s.position.y=.45; const b=box(0,0,0,.45,.5,.05,MAT.wood,g); b.position.set(0,.75,-.2); const l=box(0,0,0,.4,.45,.4,MAT.woodD,g); l.position.y=.22; world.add(g); return addProp(g,new THREE.Vector3(.25,.4,.25),6,false,new THREE.Vector3(x,y+.4,z)); }
+function mkTV(x,y,z){ const g=new THREE.Group(); const b=box(0,0,0,.6,.5,.5,MAT.black,g); b.position.y=.25; world.add(g); return addProp(g,new THREE.Vector3(.3,.25,.25),14,true,new THREE.Vector3(x,y+.3,z),true); }
+function mkDumpster(x,y,z){ const g=new THREE.Group(); const b=box(0,0,0,2.1,1.2,1.1,MAT.metalD,g); b.position.y=.7; const lid=box(0,0,0,2.1,.08,1.15,MAT.rust,g); lid.position.y=1.34; world.add(g); return addProp(g,new THREE.Vector3(1.05,.7,.55),120,true,new THREE.Vector3(x,y+.7,z),true); }
+
+// ============================================================ PHYSICS
+const GRAV=-22;
+function collidePlayerAABB(p, r, h){
+  for(const b of statics){
+    if(p.x+r<b.min.x||p.x-r>b.max.x||p.z+r<b.min.z||p.z-r>b.max.z) continue;
+    if(p.y+h<b.min.y||p.y>b.max.y) continue;
+    if(b.max.y-p.y<=.42 && b.max.y-p.y>-0.01){ p.y=b.max.y; PLAYER.onGround=true; PLAYER.vel.y=Math.max(0,PLAYER.vel.y); continue; }
+    const dx1=b.max.x-(p.x-r), dx2=(p.x+r)-b.min.x, dz1=b.max.z-(p.z-r), dz2=(p.z+r)-b.min.z;
+    const m=Math.min(dx1,dx2,dz1,dz2);
+    if(m===dx1) p.x=b.max.x+r; else if(m===dx2) p.x=b.min.x-r;
+    else if(m===dz1) p.z=b.max.z+r; else p.z=b.min.z-r;
+  }
+}
+function propCollide(pr){
+  const p=pr.pos, h=pr.half;
+  if(p.y-h.y<0){ p.y=h.y; if(pr.vel.y<0){ pr.vel.y*=-.25; pr.vel.x*=.7; pr.vel.z*=.7; if(Math.abs(pr.vel.y)<1) pr.vel.y=0; } }
+  for(const b of statics){
+    if(p.x+h.x<b.min.x||p.x-h.x>b.max.x||p.z+h.z<b.min.z||p.z-h.z>b.max.z||p.y+h.y<b.min.y||p.y-h.y>b.max.y) continue;
+    const dx1=b.max.x-(p.x-h.x), dx2=(p.x+h.x)-b.min.x, dz1=b.max.z-(p.z-h.z), dz2=(p.z+h.z)-b.min.z, dy1=b.max.y-(p.y-h.y), dy2=(p.y+h.y)-b.min.y;
+    const m=Math.min(dx1,dx2,dz1,dz2,dy1,dy2);
+    if(m===dy1){ p.y=b.max.y+h.y; if(pr.vel.y<0){pr.vel.y*=-.2; pr.vel.x*=.75; pr.vel.z*=.75;} }
+    else if(m===dy2){ p.y=b.min.y-h.y; if(pr.vel.y>0) pr.vel.y=0; }
+    else if(m===dx1){ p.x=b.max.x+h.x; pr.vel.x=Math.abs(pr.vel.x)*.3; }
+    else if(m===dx2){ p.x=b.min.x-h.x; pr.vel.x=-Math.abs(pr.vel.x)*.3; }
+    else if(m===dz1){ p.z=b.max.z+h.z; pr.vel.z=Math.abs(pr.vel.z)*.3; }
+    else { p.z=b.min.z-h.z; pr.vel.z=-Math.abs(pr.vel.z)*.3; }
+  }
+}
+const magPoints=[]; // {pos,ttl,mesh,target(enemy|null)}
+function physStep(dt){
+  for(const mp of magPoints){
+    mp.ttl-=dt;
+    mp.mesh.position.copy(mp.pos); // keep orb visual on the magnet point
+    if(mp.target && mp.target.hp>0){ mp.pos.copy(mp.target.mesh.position).add(new THREE.Vector3(0,1,0)); }
+    for(const pr of props){
+      if(!pr.metal||pr.held) continue;
+      const d=new THREE.Vector3().subVectors(mp.pos,pr.pos); const dist=d.length();
+      if(dist>20) continue;
+      if(dist<1.0){ pr.stuck=.12; pr.stuckTo=mp; continue; }
+      const f=(140/(0.4+dist*0.22));
+      pr.vel.addScaledVector(d.normalize(), f*dt*30/Math.max(pr.mass*.14,1));
+      pr.ang.set((Math.random()-.5)*6,(Math.random()-.5)*6,(Math.random()-.5)*6);
+    }
+  }
+  for(let i=magPoints.length-1;i>=0;i--){ if(magPoints[i].ttl<=0){ fxGroup.remove(magPoints[i].mesh); magPoints.splice(i,1);} }
+  for(const pr of props){
+    if(pr.held) continue;
+    if(pr.stuck>0 && pr.stuckTo && pr.stuckTo.ttl>0){
+      pr.stuck-=dt;
+      pr.pos.lerp(pr.stuckTo.pos, Math.min(1,dt*10)); pr.vel.set(0,0,0); continue;
+    }
+    pr.vel.y+=GRAV*dt;
+    pr.vel.multiplyScalar(1-.4*dt);
+    pr.pos.addScaledVector(pr.vel,dt);
+    pr.mesh.rotation.x+=pr.ang.x*dt; pr.mesh.rotation.y+=pr.ang.y*dt; pr.mesh.rotation.z+=pr.ang.z*dt;
+    pr.ang.multiplyScalar(1-2*dt);
+    propCollide(pr);
+    const sp=pr.vel.length();
+    if(sp>7){
+      for(const e of enemies){ if(e.hp>0 && e.mesh.position.distanceToSquared(pr.pos)<(pr.half.x+.7)**2*2){ damageEnemy(e, sp*pr.mass*.09, pr.vel.clone().normalize().multiplyScalar(6)); spark(pr.pos, 0xffcc66, 6); } }
+    }
+  }
+}
+
+// ============================================================ PARTICLES / FX
+const parts=[];
+function spark(pos,color,n=8){ for(let i=0;i<n;i++){ const m=new THREE.Mesh(BOXG,new THREE.MeshBasicMaterial({color})); m.scale.setScalar(.04+Math.random()*.05); m.position.copy(pos); fxGroup.add(m); parts.push({mesh:m,vel:new THREE.Vector3((Math.random()-.5)*7,Math.random()*6,(Math.random()-.5)*7),ttl:.4+Math.random()*.4}); } }
+function gore(pos){ for(let i=0;i<4;i++){ const m=new THREE.Mesh(BOXG,MAT.rotDark); m.scale.setScalar(.1+Math.random()*.14); m.position.copy(pos); fxGroup.add(m); parts.push({mesh:m,vel:new THREE.Vector3((Math.random()-.5)*8,3+Math.random()*5,(Math.random()-.5)*8),ttl:1.2+Math.random()}); } blood(pos); }
+function blood(pos){ spark(pos,0x7a1408,10); }
+function arcFX(a,b,color=0x66ddff){ const pts=[]; const seg=7; for(let i=0;i<=seg;i++){ const p=new THREE.Vector3().lerpVectors(a,b,i/seg); if(i>0&&i<seg){p.x+=(Math.random()-.5)*.5;p.y+=(Math.random()-.5)*.5;p.z+=(Math.random()-.5)*.5;} pts.push(p);} const g=new THREE.BufferGeometry().setFromPoints(pts); const l=new THREE.Line(g,new THREE.LineBasicMaterial({color,transparent:true,opacity:.95})); fxGroup.add(l); parts.push({mesh:l,vel:null,ttl:.12}); }
+function fxStep(dt){ for(let i=parts.length-1;i>=0;i--){ const p=parts[i]; p.ttl-=dt; if(p.vel){p.mesh.position.addScaledVector(p.vel,dt); p.vel.y-=14*dt;} else if(p.mesh.material) p.mesh.material.opacity=p.ttl*8; if(p.ttl<=0){ fxGroup.remove(p.mesh); parts.splice(i,1);} } }
+let muzzle=null;
+function muzzleFlash(){ if(!muzzle){ muzzle=new THREE.PointLight(0xffaa44,0,9); scene.add(muzzle); } muzzle.position.copy(eyePos()).addScaledVector(lookDir(),1); muzzle.intensity=40; }
+function muzzleStep(dt){ if(muzzle&&muzzle.intensity>0) muzzle.intensity=Math.max(0,muzzle.intensity-400*dt); }
+
+// ============================================================ ENEMIES
+const ETYPES={
+  shambler:{hp:60, spd:2.4, dmg:12, scale:1, mat:'rot', range:1.4},
+  fast:{hp:45, spd:6.2, dmg:9, scale:.95, mat:'rotDark', range:1.6, leap:true},
+  acid:{hp:130, spd:1.7, dmg:8, scale:1.25, mat:'acid', range:8, ranged:true},
+  elec:{hp:110, spd:3.0, dmg:14, scale:1.1, mat:'elec', range:2.2, zap:true, elecImmune:true},
+  crab:{hp:12, spd:3.4, dmg:5, scale:.32, mat:'crab', range:1.1, leap:true},
+  monkey:{hp:25, spd:5.2, dmg:6, scale:.5, mat:'rotDark', range:7, thrower:true, fearLight:true},
+  boss:{hp:900, spd:4.6, dmg:22, scale:1.9, mat:'grig', range:2.4},
+};
+function spawnEnemy(type,x,z){
+  const T=ETYPES[type];
+  const g=new THREE.Group();
+  const s=T.scale;
+  const body=box(0,0,0,.62*s,1.0*s,.4*s,MAT[T.mat],g); body.position.y=.85*s;
+  const head=box(0,0,0,.34*s,.34*s,.34*s,MAT[T.mat],g); head.position.y=1.55*s;
+  const armL=box(0,0,0,.14*s,.8*s,.14*s,MAT[T.mat],g); armL.position.set(-.4*s,.95*s,0);
+  const armR=box(0,0,0,.14*s,.8*s,.14*s,MAT[T.mat],g); armR.position.set(.4*s,.95*s,0);
+  const legL=box(0,0,0,.18*s,.5*s,.18*s,MAT.rotDark,g); legL.position.set(-.16*s,.25*s,0);
+  const legR=box(0,0,0,.18*s,.5*s,.18*s,MAT.rotDark,g); legR.position.set(.16*s,.25*s,0);
+  if(type==='crab'){ g.scale.setScalar(.7); }
+  if(type==='elec'){ const arc1=box(0,0,0,.1,1.9,.1,MAT.elec,g); arc1.position.y=1.1; }
+  g.position.set(x,0,z);
+  world.add(g);
+  const e={type,T,hp:T.hp,mesh:g,atkCd:0,zapCd:0,throwCd:0,hitT:0,dead:0,magnetized:0,walkP:Math.random()*9,vel:new THREE.Vector3(),distraction:null,boss:type==='boss'};
+  enemies.push(e); return e;
+}
+function damageEnemy(e,dmg,kb){
+  if(e.hp<=0) return;
+  e.hp-=dmg; e.hitT=.15; blood(e.mesh.position.clone().add(new THREE.Vector3(0,1,0)));
+  if(kb) e.vel.add(kb);
+  if(e.hp<=0){ e.dead=.001; sfx('hit'); gore(e.mesh.position.clone().add(new THREE.Vector3(0,1,0))); }
+}
+function enemyStep(dt){
+  const pp=PLAYER.pos;
+  for(let i=enemies.length-1;i>=0;i--){
+    const e=enemies[i];
+    if(e.dead>0){ e.dead+=dt; e.mesh.rotation.x=Math.min(Math.PI/2,(e.dead)*4); e.mesh.position.y=Math.max(-1.2,-e.dead*.5); if(e.dead>2.2){ world.remove(e.mesh); enemies.splice(i,1);} continue; }
+    e.hitT=Math.max(0,e.hitT-dt); e.atkCd-=dt; e.zapCd-=dt; e.throwCd-=dt;
+    const ep=e.mesh.position;
+    let target=pp;
+    if(e.distraction && e.distraction.ttl>0){ e.distraction.ttl-=dt; target=e.distraction.pos; }
+    if(e.T.fearLight){
+      const toE=new THREE.Vector3().subVectors(ep,pp); const d2=toE.length();
+      if(d2<9){ const fwd=new THREE.Vector3(-Math.sin(G.yaw),0,-Math.cos(G.yaw)); if(fwd.dot(toE.clone().normalize())>.8){ e.vel.add(toE.normalize().multiplyScalar(30*dt)); } }
+    }
+    const d=new THREE.Vector3().subVectors(target,ep); d.y=0; const dist=d.length();
+    const chase = dist<28 || e.hp<e.T.hp;
+    if(chase && dist>e.T.range*.8){
+      const dir=d.normalize();
+      e.vel.x+=dir.x*e.T.spd*3*dt; e.vel.z+=dir.z*e.T.spd*3*dt;
+      if(e.strafeT>0){ e.strafeT-=dt; const px=-dir.z*(e.strafe||1), pz=dir.x*(e.strafe||1);
+        e.vel.x+=px*e.T.spd*3*dt; e.vel.z+=pz*e.T.spd*3*dt; }
+      const sp=Math.hypot(e.vel.x,e.vel.z), max=e.T.spd;
+      if(sp>max){ e.vel.x*=max/sp; e.vel.z*=max/sp; }
+      e.mesh.rotation.y=Math.atan2(dir.x,dir.z);
+    } else { e.vel.x*=.8; e.vel.z*=.8; }
+    if(e.T.ranged && dist<14 && e.atkCd<=0){ e.atkCd=2.4; spitAcid(ep,pp); }
+    if(e.T.thrower && dist<10 && e.throwCd<=0){ e.throwCd=3.2; monkeyThrow(ep); }
+    if(e.T.leap && dist<4 && dist>1.6 && e.atkCd<=0){ e.atkCd=1.6; e.vel.y=5.5; e.vel.x+=Math.sign(d.x)*3; e.vel.z+=Math.sign(d.z)*3; }
+    if(dist<e.T.range && e.atkCd<=0){ e.atkCd=1.1; if(e.boss) e.lunge=.35; hurtPlayer(e.T.dmg,ep); }
+    if(e.T.zap && e.zapCd<=0){
+      let zapped=false;
+      if(dist<4.2){ zapPlayer(9); arcFX(ep.clone().add(new THREE.Vector3(0,1.4,0)), pp.clone(), 0x66ddff); zapped=true; }
+      for(const pr of props){ if(pr.cond && pr.pos.distanceToSquared(ep)<9){ arcFX(ep.clone().add(new THREE.Vector3(0,1.4,0)),pr.pos,0x66ddff); zapped=true; } }
+      if(zapped){ e.zapCd=.9; sfx('zap'); }
+    }
+    e.vel.y+=GRAV*dt;
+    ep.addScaledVector(e.vel,dt);
+    if(ep.y<0){ep.y=0; e.vel.y=0;}
+    if(chase && dist>e.T.range*.8){
+      e.stuckAcc=(e.stuckAcc||0)+dt; if(!e.lp) e.lp=ep.clone();
+      if(e.stuckAcc>1.2){ if(ep.distanceTo(e.lp)<Math.max(.6,e.T.spd*.9)){ e.strafe=Math.random()<.5?-1:1; e.strafeT=.9; } e.lp.copy(ep); e.stuckAcc=0; }
+    }
+    for(const b of statics){
+      if(ep.x+.35<b.min.x||ep.x-.35>b.max.x||ep.z+.35<b.min.z||ep.z-.35>b.max.z) continue;
+      if(ep.y+1.6<b.min.y||ep.y>b.max.y) continue;
+      if(b.max.y-ep.y<=.45){ ep.y=b.max.y; e.vel.y=0; continue; }
+      const dx1=b.max.x-(ep.x-.35),dx2=(ep.x+.35)-b.min.x,dz1=b.max.z-(ep.z-.35),dz2=(ep.z+.35)-b.min.z;
+      const m=Math.min(dx1,dx2,dz1,dz2);
+      if(m===dx1){ep.x=b.max.x+.35; if(e.vel.x<0)e.vel.x=0;} else if(m===dx2){ep.x=b.min.x-.35; if(e.vel.x>0)e.vel.x=0;} else if(m===dz1){ep.z=b.max.z+.35; if(e.vel.z<0)e.vel.z=0;} else {ep.z=b.min.z-.35; if(e.vel.z>0)e.vel.z=0;}
+    }
+    e.walkP+=dt*(2+Math.hypot(e.vel.x,e.vel.z)*2);
+    if(!e.boss) e.mesh.children.forEach((c,ci)=>{ if(ci>=2&&ci<=5) c.rotation.x=Math.sin(e.walkP+(ci%2)*Math.PI)*.5; });
+    else { // the Minister: breathing, lurch, venom pulse, spike twitch
+      const mv=Math.min(1,Math.hypot(e.vel.x,e.vel.z)/e.T.spd);
+      e.mesh.rotation.z=Math.sin(e.walkP*.9)*.08*mv;
+      e.mesh.rotation.x=-(e.lunge||0)*.9;
+      if(e.lunge>0) e.lunge-=dt;
+      e.mesh.children[0].scale.y=1+Math.sin(G.time*1.7)*.025;
+      const lump=e.mesh.children[2]; if(lump&&lump.material.emissive) lump.material.emissiveIntensity=.5+Math.sin(G.time*3.1)*.3;
+      const spike=e.mesh.children[3]; if(spike) spike.rotation.z=Math.sin(G.time*2.3)*.18;
+      e.mesh.position.y=Math.abs(Math.sin(e.walkP))*.07*mv;
+    }
+    for(const a of arcs){ if(!a.active||e.T.elecImmune) continue;
+      const p2=ep.clone(); p2.y+=.2;
+      if(distPointSeg(p2,a.a,a.b)<.6){ damageEnemy(e, 55*dt); if(Math.random()<.1){ arcFX(a.a,a.b); spark(ep,0x66ddff,3);} }
+    }
+    for(const t of traps){ if(t.kind==='blade'&&t.spin>2){ if(ep.distanceToSquared(t.mesh.position)<1.7){ damageEnemy(e,180*dt,new THREE.Vector3((Math.random()-.5)*8,4,(Math.random()-.5)*8)); } } }
+  }
+}
+function distPointSeg(p,a,b){ const ab=new THREE.Vector3().subVectors(b,a); const t=Math.max(0,Math.min(1,new THREE.Vector3().subVectors(p,a).dot(ab)/ab.lengthSq())); return new THREE.Vector3().copy(a).addScaledVector(ab,t).distanceTo(p); }
+const projectiles=[];
+function spitAcid(from,to){ const m=new THREE.Mesh(new THREE.SphereGeometry(.14,6,6),MAT.acid); m.position.copy(from).add(new THREE.Vector3(0,1.5,0)); fxGroup.add(m); const v=new THREE.Vector3().subVectors(to,m.position).normalize().multiplyScalar(11); v.y+=2.5; projectiles.push({mesh:m,vel:v,kind:'acid',ttl:3}); }
+function monkeyThrow(from){ const m=box(0,0,0,.3,.3,.3,MAT.wood,fxGroup); m.position.copy(from).add(new THREE.Vector3(0,1,0)); const v=new THREE.Vector3().subVectors(PLAYER.pos,m.position).normalize().multiplyScalar(12); v.y+=3; projectiles.push({mesh:m,vel:v,kind:'junk',ttl:3}); sfx('melee'); }
+function projStep(dt){ for(let i=projectiles.length-1;i>=0;i--){ const p=projectiles[i]; p.ttl-=dt; p.vel.y+=GRAV*.6*dt; p.mesh.position.addScaledVector(p.vel,dt); const mp=p.mesh.position;
+  if(mp.distanceToSquared(PLAYER.pos)<.8){ hurtPlayer(p.kind==='acid'?14:8,mp); fxGroup.remove(p.mesh); projectiles.splice(i,1); continue; }
+  if(mp.y<0||p.ttl<=0){ if(p.kind==='acid'){ spark(mp,0x7aba3a,8); if(mp.distanceToSquared(PLAYER.pos)<2.2) hurtPlayer(10,mp); } fxGroup.remove(p.mesh); projectiles.splice(i,1); } } }
+
+// ============================================================ TRAPS / ELECTRICITY
+function mkBladeTrap(x,z){ const g=new THREE.Group(); const pole=box(0,0,0,.15,1.1,.15,MAT.metalD,g); pole.position.y=.55; const hub=new THREE.Group(); hub.position.y=1.15; for(let k=0;k<3;k++){ const bl=box(0,0,0,1.9,.05,.22,MAT.metal,hub); bl.rotation.y=k*Math.PI/3; } g.add(hub); g.position.set(x,0,z); world.add(g); const t={kind:'blade',mesh:g,hub,spin:0,pos:new THREE.Vector3(x,1.15,z),held:false}; traps.push(t); inters.push({pos:new THREE.Vector3(x,1,z),r:2.2,label:'E - grab / place blade trap',act(){ t.held=!t.held; }}); return t; }
+const powerSources=[];
+function mkOutlet(x,y,z){ const m=box(x,y,z,.25,.35,.12,MAT.metalD); powerSources.push({pos:new THREE.Vector3(x,y+.2,z),mesh:m,on:true}); return m; }
+function mkGenerator(x,z){ const g=new THREE.Group(); const b=box(0,0,0,1.2,1.1,.8,MAT.rust,g); b.position.y=.55; const pipe=box(0,0,0,.18,1.6,.18,MAT.metalD,g); pipe.position.set(.4,.8,0); g.position.set(x,0,z); world.add(g); addStatic(x,0,z,1.2,1.1,.8,{}); const s={pos:new THREE.Vector3(x,1.2,z),mesh:g,on:false,gen:true,nails:0}; powerSources.push(s); return s; }
+function rebuildArcs(){
+  arcs.length=0;
+  const ns=nails.filter(n=>n.ttl>0);
+  const onSrc=powerSources.filter(s=>s.on);
+  const powered=new Set();
+  let changed=true;
+  while(changed){ changed=false;
+    for(const n of ns){ if(powered.has(n)) continue;
+      for(const s of onSrc){ if(n.pos.distanceTo(s.pos)<3.2){ powered.add(n); changed=true; break; } }
+      if(!powered.has(n)) for(const m of powered){ if(n.pos.distanceTo(m.pos)<4.2){ powered.add(n); changed=true; break; } }
+    }
+  }
+  for(let i=0;i<ns.length;i++) for(let j=i+1;j<ns.length;j++){
+    if(powered.has(ns[i])&&powered.has(ns[j])&&ns[i].pos.distanceTo(ns[j].pos)<4.2) arcs.push({a:ns[i].pos.clone(),b:ns[j].pos.clone(),active:true,t:0});
+  }
+  for(const a of levelExtraArcs) arcs.push(a);
+}
+const levelExtraArcs=[];
+function arcStep(dt){ for(const a of arcs){ a.t=(a.t||0)-dt; if(a.active&&a.t<=0){ a.t=.09+Math.random()*.08; arcFX(a.a,a.b); } }
+  for(const a of arcs){ if(!a.active) continue; if(distPointSeg(PLAYER.pos,a.a,a.b)<.6) zapPlayer(30*dt); }
+}
+function zapPlayer(dmg){ if(G.absorb>0){ G.absorb=Math.max(0,G.absorb-dmg*1.6); zapvin(); updHUD(); } else hurtPlayer(dmg,PLAYER.pos.clone().add(new THREE.Vector3(0,-1,0)),true); }
+function trapStep(dt){ for(const t of traps){ if(t.kind==='blade'){ const near=enemies.some(e=>e.hp>0&&e.mesh.position.distanceToSquared(t.mesh.position)<20); t.spin+= ((near?9:1.2)-t.spin)*dt*2; t.hub.rotation.y+=t.spin*dt; if(t.held){ const fwd=new THREE.Vector3(-Math.sin(G.yaw),0,-Math.cos(G.yaw)); t.mesh.position.copy(PLAYER.pos).addScaledVector(fwd,1.6); t.mesh.position.y=0; t.pos.copy(t.mesh.position).add(new THREE.Vector3(0,1.15,0)); t.mesh.position.y=0; } } } }
+
+// ============================================================ WEAPONS
+const WDEFS=[
+  {name:'MAGNET GUN', mode:'ATTRACT', ammo:Infinity, cd:.55},
+  {name:'NAIL GUN', mode:'CONDUCT', ammo:140, cd:.16},
+  {name:'SHOTGUN', mode:'SHELLS', ammo:24, cd:.9},
+];
+let wcd=0;
+function selectWeapon(i){ if(i<0||i>=G.weapons.length) return; G.weapon=i; updHUD(); }
+function curW(){ return G.weapons[G.weapon]; }
+function eyePos(){ return PLAYER.pos.clone().add(new THREE.Vector3(0,PLAYER.eye,0)); }
+function lookDir(){ return new THREE.Vector3(-Math.sin(G.yaw)*Math.cos(G.pitch), Math.sin(G.pitch), -Math.cos(G.yaw)*Math.cos(G.pitch)); }
+function rayHitStatic(o,d,maxD){
+  let best=null,bd=maxD;
+  for(const b of statics){ const t=rayAABB(o,d,b); if(t!==null&&t<bd){ bd=t; best={box:b,dist:t}; } }
+  if(d.y<-.0001){ const t=-o.y/d.y; if(t>0&&t<bd){ bd=t; best={box:null,dist:t,ground:true}; } }
+  return best;
+}
+function rayAABB(o,d,b){
+  let tmin=0,tmax=1e9;
+  for(const ax of ['x','y','z']){
+    const inv=1/d[ax]; let t1=(b.min[ax]-o[ax])*inv, t2=(b.max[ax]-o[ax])*inv;
+    if(t1>t2){const tt=t1;t1=t2;t2=tt;}
+    tmin=Math.max(tmin,t1); tmax=Math.min(tmax,t2);
+    if(tmin>tmax) return null;
+  }
+  return tmin;
+}
+function rayEnemy(o,d,maxD){
+  let best=null,bd=maxD;
+  for(const e of enemies){ if(e.hp<=0) continue;
+    const c=e.mesh.position.clone(); c.y+=1;
+    const oc=new THREE.Vector3().subVectors(o,c);
+    const b=oc.dot(d), rr=.55*Math.sqrt(Math.max(1,e.T.scale)), cc=oc.dot(oc)-rr*rr;
+    const disc=b*b-cc; if(disc<0) continue;
+    const t=-b-Math.sqrt(disc); if(t>0&&t<bd){bd=t;best={e,dist:t};}
+  }
+  return best;
+}
+function fireWeapon(){
+  const w=curW(); if(!w||wcd>0) return;
+  if(w.ammo<=0){ sfx('melee'); return; }
+  const o=eyePos(), d=lookDir();
+  wcd=w.cd; muzzleFlash();
+  if(w.name==='MAGNET GUN'){
+    sfx('magnet');
+    const se=rayEnemy(o,d,60); const sh=rayHitStatic(o,d,60);
+    if(se && (!sh||se.dist<sh.dist)){
+      const mp={pos:se.e.mesh.position.clone().add(new THREE.Vector3(0,1.1,0)), ttl:6, mesh:magOrb(), target:se.e};
+      se.e.magnetized=6; magPoints.push(mp); spark(mp.pos,0xffaa33,10);
+    } else if(sh){
+      const p=o.clone().addScaledVector(d,sh.dist-.1);
+      magPoints.push({pos:p,ttl:6,mesh:magOrb(),target:null}); spark(p,0xffaa33,10);
+    } else {
+      const p=o.clone().addScaledVector(d,26);
+      magPoints.push({pos:p,ttl:4,mesh:magOrb(),target:null});
+    }
+  } else if(w.name==='NAIL GUN'){
+    w.ammo--; sfx('nail');
+    const se=rayEnemy(o,d,70); const sh=rayHitStatic(o,d,70);
+    if(se&&se.dist<(sh?sh.dist:Infinity)){ damageEnemy(se.e,16, d.clone().multiplyScalar(2)); spark(se.e.mesh.position.clone().add(new THREE.Vector3(0,1.2,0)),0xffd090,4); }
+    else if(sh){
+      const p=o.clone().addScaledVector(d,sh.dist-.06);
+      nailAt(p);
+    }
+    updHUD();
+  } else if(w.name==='SHOTGUN'){
+    w.ammo--; sfx('shot');
+    for(let p=0;p<7;p++){
+      const dd=d.clone(); dd.x+=(Math.random()-.5)*.1; dd.y+=(Math.random()-.5)*.08; dd.z+=(Math.random()-.5)*.1; dd.normalize();
+      const se=rayEnemy(o,dd,40);
+      if(se) damageEnemy(se.e,9,dd.clone().multiplyScalar(3));
+    }
+    const sh=rayHitStatic(o,d,30); if(sh) spark(o.clone().addScaledVector(d,sh.dist-.1),0xffcf80,5);
+    updHUD();
+  }
+}
+function magOrb(){ const m=new THREE.Mesh(new THREE.SphereGeometry(.16,10,10),new THREE.MeshStandardMaterial({color:0x552200,emissive:0xff8811,emissiveIntensity:2.5})); fxGroup.add(m); return m; }
+function nailAt(p){
+  const m=new THREE.Mesh(new THREE.ConeGeometry(.05,.3,6),MAT.metal);
+  m.position.copy(p); m.rotation.x=Math.PI; fxGroup.add(m);
+  nails.push({pos:p.clone(),mesh:m,ttl:60});
+  if(nails.length>26){ const old=nails.shift(); fxGroup.remove(old.mesh); }
+  rebuildArcs();
+}
+function altFire(){
+  const w=curW();
+  if(w&&w.name==='MAGNET GUN'){
+    sfx('magnet');
+    const o=eyePos();
+    for(const pr of props){ const dd=new THREE.Vector3().subVectors(pr.pos,o); const dist=dd.length(); if(dist<8){ pr.vel.addScaledVector(dd.normalize(), (9-dist)*3.2); pr.vel.y+=4; } }
+    spark(o.clone().addScaledVector(lookDir(),1.2),0xffaa33,12);
+  } else {
+    // BUTTSTROKE melee - always available, replaces the crowbar
+    sfx('melee');
+    const o=eyePos(), d=lookDir();
+    const se=rayEnemy(o,d,2.1);
+    if(se){ damageEnemy(se.e,20,d.clone().multiplyScalar(9).add(new THREE.Vector3(0,3,0))); cameraShake(.25); }
+  }
+}
+let shake=0;
+function cameraShake(v){ shake=Math.max(shake,v); }
+
+// ============================================================ PLAYER DAMAGE / HUD
+function hurtPlayer(dmg,from,electric){
+  if(G.state!=='play') return;
+  if(electric && G.absorb>0){ zapPlayer(dmg); return; }
+  G.hp-=dmg; document.getElementById('dmgvin').style.opacity=.9;
+  setTimeout(()=>document.getElementById('dmgvin').style.opacity=0,130);
+  cameraShake(.4); updHUD();
+  if(G.hp<=0){ G.hp=0; die(); }
+}
+function zapvin(){ const z=document.getElementById('zapvin'); z.style.opacity=.9; setTimeout(()=>z.style.opacity=0,110); }
+function die(){ if(G.state!=='play') return; G.state='dead'; if(!QA) document.exitPointerLock&&document.exitPointerLock(); document.getElementById('deadcard').style.display='flex'; }
+function updHUD(){
+  document.getElementById('hpbar').style.width=Math.max(0,G.hp)+'%';
+  document.getElementById('absbar').style.width=Math.max(0,G.absorb)+'%';
+  const w=curW();
+  if(w){ document.getElementById('wname').textContent=w.name; document.getElementById('wcount').textContent=w.ammo===Infinity?'CELL':w.ammo; document.getElementById('wmode').textContent=w.mode; }
+  else { document.getElementById('wname').textContent='FISTS'; document.getElementById('wcount').textContent='--'; document.getElementById('wmode').textContent='RMB BUTTSTROKE'; }
+}
+function objective(t){ document.getElementById('objective').textContent=t; }
+let subT=null;
+function subtitle(who,text,secs=4){
+  const s=document.getElementById('subtitle'); s.innerHTML=(who?`<b>${who}:</b> `:'')+text; s.style.display='block';
+  clearTimeout(subT); subT=setTimeout(()=>s.style.display='none',secs*1000);
+}
+let hintT=null;
+function hint(text,secs=5){ const h=document.getElementById('hint'); h.innerHTML=text; h.style.display='block'; clearTimeout(hintT); hintT=setTimeout(()=>h.style.display='none',secs*1000); }
+
+// ============================================================ INTERACT
+function nearestInter(){ const p=PLAYER.pos; let best=null,bd=1e9; for(const it of inters){ const d=it.pos.distanceToSquared(p); if(d<it.r*it.r&&d<bd){bd=d;best=it;} } return best; }
+function tryInteract(){ const it=nearestInter(); if(it) it.act(); }
+
+// ============================================================ MOVEMENT
+let stepT=0;
+function playerStep(dt){
+  const sprinting=(G.keys['ShiftLeft']||G.keys['ShiftRight'])&&(G.keys['KeyW']||G.keys['KeyA']||G.keys['KeyS']||G.keys['KeyD']);
+  const sp=sprinting?PLAYER.sprint:PLAYER.speed;
+  const tgtFov=sprinting?81:74;
+  camera.fov+=(tgtFov-camera.fov)*Math.min(1,dt*6); camera.updateProjectionMatrix();
+  const f=new THREE.Vector3(-Math.sin(G.yaw),0,-Math.cos(G.yaw));
+  const r=new THREE.Vector3(-f.z,0,f.x);
+  const wish=new THREE.Vector3();
+  if(G.keys['KeyW'])wish.add(f); if(G.keys['KeyS'])wish.sub(f);
+  if(G.keys['KeyD'])wish.add(r); if(G.keys['KeyA'])wish.sub(r);
+  if(wish.lengthSq()>0) wish.normalize();
+  const accel=PLAYER.onGround?40:9;
+  PLAYER.vel.x+=(wish.x*sp-PLAYER.vel.x)*Math.min(1,accel*dt)*(PLAYER.onGround?1:.3);
+  PLAYER.vel.z+=(wish.z*sp-PLAYER.vel.z)*Math.min(1,accel*dt)*(PLAYER.onGround?1:.3);
+  if(PLAYER.onGround && G.keys['Space']){ PLAYER.vel.y=7.6; PLAYER.onGround=false; }
+  PLAYER.vel.y+=GRAV*dt;
+  PLAYER.pos.addScaledVector(PLAYER.vel,dt);
+  PLAYER.onGround=false;
+  if(PLAYER.pos.y<=0){ PLAYER.pos.y=0; PLAYER.vel.y=0; PLAYER.onGround=true; }
+  collidePlayerAABB(PLAYER.pos, PLAYER.radius, PLAYER.height);
+  if(PLAYER.pos.y<-20){ PLAYER.pos.set(levelDef?levelDef.start[0]:0,2,levelDef?levelDef.start[2]:10); PLAYER.vel.set(0,0,0); }
+  const moving=Math.hypot(PLAYER.vel.x,PLAYER.vel.z)>.8 && PLAYER.onGround;
+  if(moving){ stepT-=dt; if(stepT<=0){ stepT=sprinting?.3:.42; sfx('step'); } }
+  shake=Math.max(0,shake-dt*1.8);
+  camera.position.copy(PLAYER.pos).add(new THREE.Vector3(0,PLAYER.eye,0));
+  camera.position.y += Math.sin(G.time*9)*.02*(moving?1:0);
+  if(shake>0){ camera.position.x+=(Math.random()-.5)*shake*.1; camera.position.y+=(Math.random()-.5)*shake*.1; }
+  camera.rotation.set(0,0,0); camera.rotateY(G.yaw); camera.rotateX(G.pitch);
+  G.absorb=Math.min(100,G.absorb+6*dt);
+  wcd-=dt;
+  if(firing) fireWeapon();
+  const it=nearestInter();
+  if(it) hint(it.label,.35);
+}
+
+// ============================================================ LEVEL KIT
+let lights=[]; let candles=[]; let triggers=[];
+function clearWorld(){
+  while(world.children.length) world.remove(world.children[0]);
+  while(fxGroup.children.length) fxGroup.remove(fxGroup.children[0]);
+  statics.length=0; props.length=0; enemies=[]; nails=[]; arcs=[]; traps=[]; pickups=[]; inters=[]; npcs=[]; charms=[]; projectiles.length=0; parts.length=0; magPoints.length=0; powerSources.length=0; levelExtraArcs.length=0; lights=[]; candles=[]; triggers=[]; spawnQueue=[]; window.__finale=null;
+}
+function ground(w,d,mat=MAT.stoneD){ const g=new THREE.Mesh(new THREE.BoxGeometry(w,1,d),mat); g.position.y=-.5; world.add(g); addStatic(0,-1.01,0,w,1,d,{}); return g; }
+function candle(x,y,z){ const m=box(x,y,z,.07,.22,.07,MAT.candle); candles.push(m); return m; }
+function spawnCharm(x,z){
+  const g=new THREE.Group();
+  const crate=new THREE.Mesh(new THREE.BoxGeometry(1,1,1),MAT.woodD); crate.position.y=.5; g.add(crate);
+  const porc=new THREE.MeshPhysicalMaterial({color:0xf3ead8,roughness:.22,metalness:.02,clearcoat:.8,clearcoatRoughness:.25});
+  const goldM=new THREE.MeshStandardMaterial({color:0xc9962e,metalness:.85,roughness:.28});
+  const redM=new THREE.MeshPhysicalMaterial({color:0x9e2b1e,roughness:.3,clearcoat:.6});
+  // sitting body: haunched, upright
+  const body=new THREE.Mesh(new THREE.SphereGeometry(.21,14,12),porc); body.scale.set(1,1.3,.82); body.position.y=1.27; g.add(body);
+  const haunch=new THREE.Mesh(new THREE.SphereGeometry(.13,10,8),porc); haunch.scale.set(1.15,.75,1); haunch.position.set(0,1.12,0); g.add(haunch);
+  // head, large - maneki-neko proportion
+  const head=new THREE.Mesh(new THREE.SphereGeometry(.165,14,12),porc); head.position.set(.02,1.62,0); g.add(head);
+  // ears: cream with red inner
+  const earG=new THREE.ConeGeometry(.055,.15,8);
+  const e1=new THREE.Mesh(earG,porc); e1.position.set(-.07,1.77,0); e1.rotation.z=.18; g.add(e1);
+  const e2=new THREE.Mesh(earG,porc); e2.position.set(.11,1.77,0); e2.rotation.z=-.18; g.add(e2);
+  const inG=new THREE.ConeGeometry(.03,.08,8);
+  const i1=new THREE.Mesh(inG,redM); i1.position.set(-.068,1.765,.03); i1.rotation.z=.18; g.add(i1);
+  const i2=new THREE.Mesh(inG,redM); i2.position.set(.108,1.765,.03); i2.rotation.z=-.18; g.add(i2);
+  // collar + bell
+  const collar=new THREE.Mesh(new THREE.TorusGeometry(.12,.028,8,16),redM); collar.position.set(.02,1.47,0); collar.rotation.x=Math.PI/2; g.add(collar);
+  const bell=new THREE.Mesh(new THREE.SphereGeometry(.045,10,8),goldM); bell.position.set(.02,1.44,.13); g.add(bell);
+  // raised right paw, vertical beside the head
+  const paw=new THREE.Mesh(new THREE.CylinderGeometry(.042,.05,.24,10),porc); paw.position.set(.17,1.62,.02); paw.rotation.z=-.12; g.add(paw);
+  const pad=new THREE.Mesh(new THREE.SphereGeometry(.032,8,8),redM); pad.position.set(.175,1.745,.045); g.add(pad);
+  // left paw resting on koban
+  const paw2=new THREE.Mesh(new THREE.CylinderGeometry(.04,.045,.16,10),porc); paw2.position.set(-.09,1.28,.16); paw2.rotation.x=.5; g.add(paw2);
+  // koban coin with engraved face
+  const kobanC=document.createElement('canvas'); kobanC.width=kobanC.height=128;
+  const kc=kobanC.getContext('2d');
+  kc.fillStyle='#c9962e'; kc.fillRect(0,0,128,128);
+  const grd=kc.createLinearGradient(0,0,128,128); grd.addColorStop(0,'rgba(255,240,200,.5)'); grd.addColorStop(.5,'rgba(120,80,20,.25)'); grd.addColorStop(1,'rgba(255,230,170,.35)');
+  kc.fillStyle=grd; kc.fillRect(0,0,128,128);
+  kc.strokeStyle='#7a5a14'; kc.lineWidth=5; kc.strokeRect(10,10,108,108);
+  kc.fillStyle='#7a5a14'; kc.font='bold 44px Georgia'; kc.textAlign='center'; kc.textBaseline='middle';
+  kc.fillText('千万',64,44); kc.fillText('両',64,92);
+  const kobanT=new THREE.CanvasTexture(kobanC);
+  const koban=new THREE.Mesh(new THREE.CylinderGeometry(.11,.11,.03,20),new THREE.MeshStandardMaterial({map:kobanT,metalness:.7,roughness:.35}));
+  koban.rotation.x=Math.PI/2.3; koban.position.set(-.02,1.16,.2); g.add(koban);
+  // curled tail
+  const tail=new THREE.Mesh(new THREE.TorusGeometry(.09,.032,8,14,4.2),porc); tail.position.set(-.05,1.18,-.12); tail.rotation.set(.4,1.2,0); g.add(tail);
+  const glow=new THREE.PointLight(0xc9962e,2.4,4.5); glow.position.set(0,1.7,0); g.add(glow);
+  g.position.set(x,0,z); world.add(g); charms.push({g,got:false});
+  return g;
+}
+function charmStep(dt){
+  for(const c of charms){
+    if(c.got) continue;
+    c.g.rotation.y+=dt*1.2; c.g.position.y=Math.sin(G.time*2+c.g.position.x)*0.05;
+    const dx=PLAYER.pos.x-c.g.position.x, dz=PLAYER.pos.z-c.g.position.z;
+    if(dx*dx+dz*dz<1.7){
+      c.got=true; world.remove(c.g); G.charms=(G.charms||0)+1;
+      G.hp=Math.min(100,G.hp+25);
+      for(const w of G.weapons){ if(w.name==='NAIL GUN') w.ammo+=20; if(w.name==='SHOTGUN') w.ammo=Math.min(36,w.ammo+8); }
+      sfx('pickup');
+      subtitle('LUCKY CAT','A porcelain cat, dust-grey, paw still raised. Someone kept it safe. ('+G.charms+'/6 - luck restored: +health, +ammo)',4);
+      updHUD();
+    }
+  }
+}
+function pl(x,y,z,color,inten,dist){ const L=new THREE.PointLight(color,inten,dist); L.position.set(x,y,z); world.add(L); lights.push(L); return L; }
+function fence(x1,z1,x2,z2,h=1.6){
+  const cx=(x1+x2)/2, cz=(z1+z2)/2, w=Math.abs(x2-x1)||.15, d=Math.abs(z2-z1)||.15;
+  solidBox(cx,0,cz,Math.max(w,.15),h,Math.max(d,.15),MAT.rust,{metal:true,cond:true});
+}
+function building(x,z,w,d,h,mat=MAT.plaster){ solidBox(x,0,z,w,h,d,mat); box(x,h,z,w+.4,.25,d+.4,MAT.stoneD); }
+function tombstone(x,z){ solidBox(x,0,z,.5,.9,.15,MAT.stone); }
+function treeDead(x,z){ const t=new THREE.Group(); const trunk=new THREE.Mesh(new THREE.CylinderGeometry(.12,.3,3.4,6),MAT.woodD); trunk.position.y=1.7; t.add(trunk); for(let i=0;i<3;i++){ const br=new THREE.Mesh(new THREE.CylinderGeometry(.04,.09,1.8,5),MAT.woodD); br.position.set((Math.random()-.5)*1.2,2.6+i*.5,(Math.random()-.5)*1.2); br.rotation.z=(Math.random()-.5)*1.6; br.rotation.x=(Math.random()-.5)*1.6; t.add(br);} t.position.set(x,0,z); world.add(t); }
+function pickup(x,y,z,kind,label,act){ let mesh;
+  if(kind==='magnet'){ mesh=new THREE.Group(); box(0,0,0,.5,.16,.16,MAT.metalD,mesh); const b2=box(0,0,0,.12,.4,.12,MAT.rust,mesh); b2.position.set(.2,.2,0); box(0,0,0,.2,.2,.05,new THREE.MeshStandardMaterial({color:0x220a00,emissive:0xff7711,emissiveIntensity:2}),mesh); }
+  else if(kind==='nailgun'){ mesh=new THREE.Group(); box(0,0,0,.55,.14,.14,MAT.rust,mesh); const mg=box(0,0,0,.1,.3,.1,MAT.metalD,mesh); mg.position.set(-.1,-.2,0); }
+  else if(kind==='shotgun'){ mesh=new THREE.Group(); box(0,0,0,.8,.1,.1,MAT.woodD,mesh); const b2=box(0,0,0,.5,.07,.07,MAT.metalD,mesh); b2.position.set(.15,.08,0); }
+  else { mesh=box(0,0,0,.3,.3,.3,MAT.white,new THREE.Group()); }
+  mesh.position.set(x,y,z); world.add(mesh);
+  pickups.push({mesh,kind});
+  const it={pos:new THREE.Vector3(x,y,z),r:2.4,label:`E - take ${label}`,act(){ act(); world.remove(mesh); inters.splice(inters.indexOf(it),1); }};
+  inters.push(it);
+}
+function trigger(x,z,r,act,once=true){ triggers.push({pos:new THREE.Vector3(x,0,z),r,act,once,fired:false}); }
+function triggerStep(){ for(const t of triggers){ if(t.fired&&t.once) continue; if(PLAYER.pos.distanceToSquared(t.pos)<t.r*t.r){ t.fired=true; t.act(); } } }
+function waves(text){ const w=document.getElementById('wave'); w.textContent=text; w.style.display=text?'block':'none'; }
+
+let spawnQueue=[], spawnGap=.6, spawnT=0;
+function queueHorde(list,points,gap=.6){ for(const t of list) spawnQueue.push({type:t,pts:points}); spawnGap=gap; }
+function spawnStep(dt){ window.__maxAlive=Math.max(window.__maxAlive||0,enemies.filter(e=>e.hp>0).length);
+  if(!spawnQueue.length) return; spawnT-=dt;
+  const alive=enemies.filter(e=>e.hp>0).length;
+  if(alive>=7){ spawnT=Math.max(spawnT,.5); return; } // horde pacing cap: pulses, not swarms
+  if(spawnT<=0){ spawnT=spawnGap; const s=spawnQueue.shift(); const p=s.pts[Math.floor(Math.random()*s.pts.length)]; spawnEnemy(s.type,p[0]+(Math.random()-.5)*2,p[1]+(Math.random()-.5)*2); sfx('groan'); } }
+
+// fog thickens before a horde: the town telegraphs
+let fogTarget=null;
+function fogSurge(){ if(!scene.fog) return; fogTarget={near:scene.fog.near*.55, far:scene.fog.far*.7, t:6}; }
+function fogStep(dt){ if(!fogTarget||!scene.fog) return; fogTarget.t-=dt; scene.fog.near+=(fogTarget.near-scene.fog.near)*dt*.4; scene.fog.far+=(fogTarget.far-scene.fog.far)*dt*.4; if(fogTarget.t<=0) fogTarget=null; }
+
+// ============================================================ GRIGORI NPC
+function mkGrigori(x,z,mut=0){
+  const g=new THREE.Group();
+  const robe=new THREE.Mesh(new THREE.CylinderGeometry(.34,.5,1.5,8),MAT.grig); robe.position.y=.75; g.add(robe);
+  const head=box(0,0,0,.3,.34,.3,MAT.flesh,g); head.position.y=1.7;
+  const beard=box(0,0,0,.26,.2,.12,MAT.white,g); beard.position.set(0,1.58,.12);
+  if(mut>=1){ const hood=new THREE.Mesh(new THREE.ConeGeometry(.3,.5,7),MAT.grig); hood.position.y=1.85; g.add(hood); }
+  if(mut>=2){ const lump=box(0,0,0,.3,.4,.3,MAT.acid,g); lump.position.set(.18,1.75,0); }
+  g.position.set(x,0,z); world.add(g);
+  const npc={mesh:g,mut,follow:false,waypoints:[],wp:0,speed:3.2,gone:false};
+  npcs.push(npc); return npc;
+}
+function npcStep(dt){
+  for(const n of npcs){
+    if(n.gone) continue;
+    let target=null;
+    if(n.follow){ const back=new THREE.Vector3(Math.sin(G.yaw),0,Math.cos(G.yaw)); target=PLAYER.pos.clone().addScaledVector(back,1.8); }
+    else if(n.wp<n.waypoints.length){ target=new THREE.Vector3(...n.waypoints[n.wp]); if(n.mesh.position.distanceTo(target)<1) n.wp++; }
+    if(target){ const d=new THREE.Vector3().subVectors(target,n.mesh.position); d.y=0; const dist=d.length();
+      if(dist>.8){ n.mesh.position.addScaledVector(d.normalize(),Math.min(n.speed*dt,dist)); n.mesh.rotation.y=Math.atan2(d.x,d.z); n.walkP=(n.walkP||0)+dt*6; n.mesh.position.y=Math.abs(Math.sin(n.walkP))*.05; } }
+    if(n.mesh.children[1]) n.mesh.children[1].rotation.y=Math.sin(G.time*.7+n.mesh.position.x)*.35;
+    if(n.mesh.children[0]) n.mesh.children[0].scale.y=1+Math.sin(G.time*1.5+n.mesh.position.z)*.02;
+  }
+}
+
+// ============================================================ LEVELS
+const LEVELS=[
+// ---------- L1 THE TOWN : STREETS
+{ act:'ACT I - THE TOWN', name:'STREETS', desc:'The town no one leaves. Find the church. Something in that crashed truck hums with current.',
+  sky:0x1c0f06, fog:[0x241407,18,95], start:[0,0,10], yaw:0,
+  build(){
+    ground(30,150,MAT.stoneD);
+    for(let i=0;i<6;i++){ const z=0-i*22; const h=6+((i*37)%5); building(-11,z,10,14,h, i%2?MAT.plaster:MAT.stone); building(11,z-8,10,16,h-1, i%2?MAT.stone:MAT.plaster); }
+    fence(-4,-30,-4,-55); fence(4.5,-60,4.5,-90);
+    building(2,-46,3,5,1.6,MAT.rust); // crashed truck
+    pickup(2,1.9,-46,'magnet','MAGNET GUN',()=>{ G.weapons.push({...WDEFS[0]}); selectWeapon(G.weapons.length-1); subtitle('SHEPARD','Magnetic. This will do.',4); hint('<span class=kbd>LMB</span> magnetize a surface - metal flies to it. <span class=kbd>RMB</span> repulse blast.',9); objective('Reach the church at the end of the street'); });
+    mkFridge(-3,0,-18); mkBarrel(3,0,-22); mkBarrel(2.4,0,-23); mkSawblade(0,0,-34); mkCart(-5,0,-52); mkDumpster(-7,0,-70); mkIBeam(5,0,-64,5); mkTV(4,0,-15); mkChair(-2,0,-12); mkBarrel(-6,0,-85); mkSawblade(6,0,-95); mkFridge(5,0,-100);
+    for(let i=0;i<8;i++){ candle(-4+(i%2)*8,1.1,-14-i*13); }
+    pl(0,3,-46,0xff7722,30,18); pl(0,4,-110,0xff9944,40,25); pl(0,4,-10,0xff8830,25,20);
+    spawnEnemy('shambler',-3,-26); spawnEnemy('shambler',4,-38); spawnEnemy('shambler',-5,-58);
+    trigger(0,-52,6,()=>{ fogSurge(); queueHorde(['shambler','shambler','shambler','fast'],[[-4,-72],[4,-74],[0,-80]],.8); subtitle('GRIGORI','(distant, carried on the fog) ...my children... come, come...',4); });
+    spawnEnemy('shambler',2,-88); spawnEnemy('fast',-4,-102);
+    building(0,-122,14,10,9,MAT.stone); // church
+    box(0,0,-117.2,3,4,.3,MAT.woodD);
+    candle(-1.4,1,-117); candle(1.4,1,-117); pl(0,2.5,-115,0xff8830,25,12);
+    trigger(0,-114,4,()=>{ objective('The church door. Get inside.'); });
+    trigger(0,-116.5,2.2,()=>{ nextLevel(); });
+    objective('Push through the street. The church spire is your landmark.');
+    hint('<span class=kbd>WASD</span> move - <span class=kbd>SPACE</span> jump - <span class=kbd>RMB</span> buttstroke',8);
+  }},
+// ---------- L2 CHURCHYARD
+{ act:'ACT I - THE TOWN', name:'CHURCHYARD', desc:'Behind the church, the dead keep their own garden. The hospital waits on the hill.',
+  sky:0x180d05, fog:[0x1e1006,14,80], start:[0,0,8], yaw:0,
+  build(){
+    ground(60,90,MAT.stoneD);
+    building(0,14,16,10,9,MAT.stone);
+    for(let i=0;i<24;i++){ tombstone(-14+(i%6)*5.4, -6-Math.floor(i/6)*7); }
+    for(let i=0;i<8;i++) treeDead(-20+Math.random()*40,-8-Math.random()*55);
+    fence(-22,-2,-22,-70); fence(22,-2,22,-70); fence(-22,-70,-8,-70); fence(8,-70,22,-70);
+    mkBladeTrap(0,-30);
+    mkSawblade(-6,0,-20); mkBarrel(8,0,-26); mkFridge(-12,0,-44); mkCart(10,0,-40); mkIBeam(0,0,-50,6); mkBarrel(-3,0,-55); mkDumpster(14,0,-58);
+    for(let i=0;i<10;i++) candle(-16+(i%5)*8,.95,-10-Math.floor(i/5)*30);
+    pl(0,4,-30,0xff8830,35,26); pl(0,5,-64,0x66ff88,30,20);
+    // hospital gates
+    fence(-8,-68,-1.4,-68,3); fence(1.4,-68,8,-68,3);
+    const gateMesh=box(0,0,-68,2.4,3,.2,MAT.metalD);
+    const gate=addStatic(0,0,-68,2.6,3,.2,{metal:true});
+    spawnEnemy('shambler',-8,-14); spawnEnemy('shambler',6,-18); spawnEnemy('shambler',0,-24);
+    trigger(0,-30,9,()=>{ fogSurge(); subtitle('','The ground stirs.',2); queueHorde(['shambler','shambler','fast','shambler','shambler','fast','shambler','shambler','crab','crab'],[[-16,-50],[16,-50],[0,-60]],.7); waves('THE DEAD RISE'); objective('Survive the churchyard. Use the blade trap.'); setTimeout(()=>waves(''),14000); });
+    let gateOpen=false;
+    trigger(0,-60,10,()=>{ if(!gateOpen && enemies.filter(e=>e.hp>0).length===0 && spawnQueue.length===0){ gateOpen=true; statics.splice(statics.indexOf(gate),1); world.remove(gateMesh); spark(new THREE.Vector3(0,1.5,-68),0xffaa33,16); objective('The gate hangs open. The hospital on the hill.'); subtitle('SHEPARD','Hospital lights. Somebody is home.',4); } else if(!gateOpen){ objective('Clear the churchyard first'); } },false);
+    trigger(0,-70,3,()=>{ if(gateOpen) nextLevel(); },false);
+    objective('Cross the graveyard to the hospital gates');
+  }},
+// ---------- L3 THE WARDS
+{ act:'ACT II - THE HOSPITAL', name:'THE WARDS', desc:'Sickly green light. Candles in the dark. And a voice that remembers how to be kind.',
+  sky:0x060a06, fog:[0x0a140c,6,55], start:[0,0,5], yaw:0, interior:true,
+  build(){
+    ground(50,120,MAT.plasterG);
+    solidBox(-9,0,-25,1,4,70,MAT.plasterG); solidBox(9,0,-25,1,4,70,MAT.plasterG);
+    solidBox(0,0,12,20,4,1,MAT.plasterG); solidBox(0,0,-60,20,4,1,MAT.plasterG);
+    // Grigori's classroom
+    solidBox(-6,0,2,1,3.2,12,MAT.plaster); solidBox(6,0,2,1,3.2,12,MAT.plaster);
+    const jm=new THREE.Group(); const tank=new THREE.Mesh(new THREE.CylinderGeometry(.5,.5,1.4,8),new THREE.MeshStandardMaterial({color:0x88aa66,transparent:true,opacity:.5,roughness:.2})); tank.position.y=1.2; jm.add(tank); const base=box(0,0,0,1.2,.5,1.2,MAT.rust,jm); base.position.y=.25; const crabM=box(0,0,0,.3,.15,.4,MAT.crab,jm); crabM.position.y=1.2; jm.position.set(-4,0,4); world.add(jm);
+    box(2,0,3,1.6,.9,1,MAT.metalD);
+    const pot=new THREE.Mesh(new THREE.CylinderGeometry(.35,.35,.3,8),MAT.black); pot.position.set(2,1.05,3); world.add(pot);
+    candle(-5.5,1,6); candle(5.5,1,0); candle(-5.5,1,-4);
+    pl(0,2.6,2,0x66ff88,18,14); pl(-4,1.8,4,0x88ff66,10,8);
+    const gr=mkGrigori(-2,2,0);
+    setTimeout(()=>subtitle('GRIGORI','I confess, I am gladdened by your company. Too much solitude is not good for a man who wishes only to serve.',6),2500);
+    setTimeout(()=>{ subtitle('GRIGORI','The serum steadies me. The blood of the crab is a bitter communion. Pay no mind to the machine.',6); },9000);
+    setTimeout(()=>{ subtitle('GRIGORI','They come. They ALWAYS come. Quick - the wards. Stay near your Father.',5); barricadeBreak(); },15000);
+    const barMesh=solidBox(0,0,-10,16,2.6,.4,MAT.wood);
+    const bar=statics[statics.length-1];
+    function barricadeBreak(){
+      statics.splice(statics.indexOf(bar),1); world.remove(barMesh);
+      cameraShake(.8); sfx('shot');
+      queueHorde(['shambler','shambler','shambler','fast'],[[-6,-14],[6,-14],[0,-16]],.5);
+      gr.follow=true;
+      objective('Fight through the wards with Grigori');
+    }
+    mkCart(3,0,-18);
+    pickup(3,1.1,-18,'nailgun','NAIL GUN',()=>{ G.weapons.push({...WDEFS[1]}); subtitle('GRIGORI','The nails remember the current. Lay them as a path and the power will walk it.',6); hint('<span class=kbd>LMB</span> nails stick to walls and floors - chain them near a sparking outlet to carry the arc.',9); });
+    mkCart(-4,0,-26); mkChair(4,0,-30); mkTV(-5,0,-36); mkBarrel(5,0,-42); mkFridge(-6,0,-46); mkSawblade(2,0,-34);
+    mkOutlet(8.4,1.2,-30);
+    for(let i=0;i<6;i++) candle(-8,1,-12-i*8);
+    pl(0,3,-30,0x55dd77,22,30); pl(0,3,-52,0xff8830,15,16);
+    // power door puzzle
+    solidBox(-5.5,0,-58,7,4,1,MAT.plasterG); solidBox(5.5,0,-58,7,4,1,MAT.plasterG);
+    const doorMesh=solidBox(0,0,-58,4,3.4,.5,MAT.metalD,{metal:true,cond:true});
+    const door=statics[statics.length-1];
+    box(0,3.6,-57.6,3,.5,.2,MAT.greenlamp);
+    mkOutlet(-2,1.4,-56.5);
+    let doorOpen=false;
+    const doorCheck=setInterval(()=>{ if(G.state!=='play'||G.levelIndex!==2){clearInterval(doorCheck);return;} if(!doorOpen && arcs.some(a=>a.active && (distPointSeg(new THREE.Vector3(0,1,-58),a.a,a.b)<3.5))){ doorOpen=true; statics.splice(statics.indexOf(door),1); world.remove(doorMesh); spark(new THREE.Vector3(0,2,-58),0x66ff88,20); sfx('zap'); subtitle('GRIGORI','Ha! The current obeys. Onward, my friend.',4); objective('Through the door - deeper into the hospital'); clearInterval(doorCheck); } },400);
+    setTimeout(()=>{ if(!doorOpen) hint('Nails conduct. Chain them from the sparking outlet to the door.',8); },45000);
+    trigger(0,-59.5,2.5,()=>{ if(doorOpen){ gr.gone=true; nextLevel(); } },false);
+    objective('Listen to Grigori');
+    spawnEnemy('shambler',-4,-20);
+  }},
+// ---------- L4 HYDROTHERAPY
+{ act:'ACT II - THE HOSPITAL', name:'HYDROTHERAPY', desc:'Tiled pools, rusted gurneys, standing water. Water remembers the current too.',
+  sky:0x05090a, fog:[0x081210,7,60], start:[0,0,10], yaw:0, interior:true,
+  build(){
+    ground(60,80,MAT.plasterG);
+    solidBox(-14,0,-20,1,4.5,70,MAT.plasterG); solidBox(14,0,-20,1,4.5,70,MAT.plasterG);
+    solidBox(0,0,14,30,4.5,1,MAT.plasterG); solidBox(0,0,-54,30,4.5,1,MAT.plasterG);
+    for(const [px,pz] of [[-7,-8],[7,-8],[-7,-26],[7,-26]]){
+      solidBox(px,0,pz,7,.9,5,MAT.white);
+      box(px,.55,pz,6.2,.12,4.2,MAT.water);
+      levelExtraArcs.push({a:new THREE.Vector3(px-3,.6,pz),b:new THREE.Vector3(px+3,.6,pz),active:false,t:0,pool:true});
+    }
+    setTimeout(()=>{ if(G.levelIndex!==3)return; subtitle('GRIGORI','Careful. That one drank the lightning. Bullets will not argue with it - but a fridge will.',6); spawnEnemy('elec',0,-30); },6000);
+    pickup(4,1.1,4,'shotgun','SHOTGUN',()=>{ G.weapons.push({...WDEFS[2]}); subtitle('GRIGORI','Ah, the old argument. Loud and honest. Take it.',5); });
+    spawnEnemy('shambler',-8,-14); spawnEnemy('shambler',8,-16); spawnEnemy('fast',0,-22);
+    mkOutlet(13.4,1.2,-17); mkOutlet(-13.4,1.2,-30);
+    mkBladeTrap(-4,-18); mkBladeTrap(5,-32);
+    trigger(0,-20,10,()=>{ subtitle('GRIGORI','They smell the serum on me. Hold the room! Move the traps between the waves!',6);
+      let wnum=0;
+      const wv=setInterval(()=>{ if(G.state!=='play'||G.levelIndex!==3){clearInterval(wv);return;} wnum++;
+        if(wnum===1){ waves('WAVE 1'); fogSurge(); queueHorde(['shambler','shambler','fast','shambler','crab'],[[-11,-44],[11,-44]],.7); }
+        if(wnum===2){ waves('WAVE 2'); fogSurge(); queueHorde(['fast','fast','shambler','shambler','shambler','crab'],[[-11,-44],[11,-44],[0,-48]],.6); }
+        if(wnum===3){ waves('FINAL WAVE'); fogSurge(); queueHorde(['elec','shambler','fast','fast','shambler','acid'],[[0,-46],[-11,-44],[11,-44]],.8); }
+        if(wnum>3){ clearInterval(wv); waves(''); }
+      },26000);
+    });
+    setInterval(()=>{ if(G.levelIndex!==3)return; for(const a of levelExtraArcs){ if(!a.pool) continue; a.active = arcs.some(x=>x.active && x!==a && (distPointSeg(a.a,x.a,x.b)<2||distPointSeg(a.b,x.a,x.b)<2)); } },500);
+    mkCart(-10,0,-38); mkFridge(10,0,-40); mkBarrel(0,0,-36); mkSawblade(-6,0,-44); mkIBeam(4,0,-10,4);
+    for(let i=0;i<8;i++) candle(-12+(i%2)*24,1,-6-i*6);
+    pl(0,3.4,-8,0x66ff88,20,24); pl(0,3.4,-34,0x55dd77,20,24); pl(0,3,-48,0xff8830,14,14);
+    setTimeout(()=>{ if(G.levelIndex!==3)return; subtitle('GRIGORI','(clutching his neck) The blood sings today. Forgive me if I... ramble.',5); },30000);
+    const exdMesh=solidBox(0,0,-53.5,4,3.4,.5,MAT.metalD,{metal:true});
+    const exd=statics[statics.length-1];
+    let exOpen=false;
+    const chk=setInterval(()=>{ if(G.state!=='play'||G.levelIndex!==3){clearInterval(chk);return;} if(!exOpen && enemies.filter(e=>e.hp>0).length===0 && spawnQueue.length===0){ exOpen=true; statics.splice(statics.indexOf(exd),1); world.remove(exdMesh); objective('The labs are below. Grigori leads.'); clearInterval(chk); } },800);
+    trigger(0,-52,2.5,()=>{ if(exOpen) nextLevel(); },false);
+    objective('Hold hydrotherapy');
+  }},
+// ---------- L5 THE LABS
+{ act:'ACT II - THE HOSPITAL', name:'THE LABS', desc:'Where the serum was born. Cages, chemical hoods, and chattering in the vents.',
+  sky:0x070605, fog:[0x0c0a06,7,55], start:[0,0,10], yaw:0, interior:true,
+  build(){
+    ground(70,80,MAT.stoneD);
+    solidBox(-16,0,-20,1,4.5,70,MAT.plaster); solidBox(16,0,-20,1,4.5,70,MAT.plaster);
+    solidBox(0,0,14,34,4.5,1,MAT.plaster); solidBox(0,0,-54,34,4.5,1,MAT.plaster);
+    solidBox(0,0,-20,1,4,20,MAT.plasterG);
+    for(let i=0;i<4;i++){ const jm=new THREE.Group(); const tank=new THREE.Mesh(new THREE.CylinderGeometry(.45,.45,1.3,8),new THREE.MeshStandardMaterial({color:0x88aa66,transparent:true,opacity:.5,roughness:.2})); tank.position.y=1.1; jm.add(tank); const bs=box(0,0,0,1,.45,1,MAT.rust,jm); bs.position.y=.22; const cr=box(0,0,0,.28,.14,.36,MAT.crab,jm); cr.position.y=1.1; jm.position.set(-10+i*3.2,0,-10); world.add(jm); }
+    setTimeout(()=>{ if(G.levelIndex!==4)return; subtitle('GRIGORI','My little confessors. I gave them the blood before I took it myself. They are... shy of the light.',6); },4000);
+    spawnEnemy('monkey',-8,-24); spawnEnemy('monkey',8,-28); spawnEnemy('acid',0,-34);
+    const gE=mkGenerator(13,-40), gW=mkGenerator(-13,-40);
+    mkOutlet(13,1.5,-36); mkOutlet(-13,1.5,-36);
+    hint('Chain nails from each sparking outlet to its generator. East and West wings both need power.',10);
+    let powered=0;
+    const fdoorMesh=solidBox(0,0,-53.5,4,3.4,.5,MAT.metalD,{metal:true});
+    const fdoor=statics[statics.length-1];
+    const chk=setInterval(()=>{ if(G.state!=='play'||G.levelIndex!==4){clearInterval(chk);return;}
+      for(const g of [gE,gW]){ if(!g.on){ g.nails=nails.filter(n=>n.ttl>0&&n.pos.distanceTo(g.pos)<2.6).length; const chained=arcs.some(a=>a.active&&distPointSeg(g.pos,a.a,a.b)<2.8); if(g.nails>=1&&chained){ g.on=true; powered++; spark(g.pos,0x66ff88,24); sfx('zap'); rebuildArcs(); subtitle('GRIGORI', powered===2?'Both wings wake. The chapel lift has its power. Come.':'One wing hums. One to go.',5); } } }
+      if(powered===2){ clearInterval(chk); world.remove(fdoorMesh); statics.splice(statics.indexOf(fdoor),1); objective('The chapel lift is powered'); }
+    },700);
+    box(0,3.6,-53.2,3,.5,.2,MAT.greenlamp);
+    spawnEnemy('acid',-10,-44); spawnEnemy('shambler',6,-42); spawnEnemy('fast',-4,-46);
+    setTimeout(()=>{ if(G.levelIndex===4) queueHorde(['shambler','fast','acid','shambler'],[[-12,-50],[12,-50]],1); },45000);
+    mkCart(6,0,-14); mkFridge(-12,0,-18); mkBarrel(10,0,-22); mkSawblade(0,0,-28); mkTV(4,0,-38); mkIBeam(-6,0,-34,5); mkChair(12,0,-16); mkChair(11,0,-18);
+    for(let i=0;i<10;i++) candle(-14+(i%3)*14,1,-8-i*4.4);
+    pl(0,3.4,-10,0x88ff66,18,20); pl(-13,2.5,-40,0xff8830,16,14); pl(13,2.5,-40,0xff8830,16,14); pl(0,3,-30,0x66ff88,14,20);
+    setTimeout(()=>{ if(G.levelIndex!==4)return; subtitle('GRIGORI','(voice cracking) The hood hides what the blood makes of me. Do not look at your Father too closely, child.',6); },24000);
+    trigger(0,-52,2.5,()=>{ if(powered===2) nextLevel(); },false);
+    objective('Restore power to the East and West wings');
+  }},
+// ---------- L6 THE MINISTER
+{ act:'ACT III', name:'THE MINISTER', desc:'The chapel above the labs. What Grigori has become waits in candlelight, and the choice is yours.',
+  sky:0x0a0503, fog:[0x120806,8,60], start:[0,0,12], yaw:0, interior:true,
+  build(){
+    ground(44,70,MAT.stoneD);
+    solidBox(-10,0,-14,1,6,60,MAT.stone); solidBox(10,0,-14,1,6,60,MAT.stone);
+    solidBox(0,0,16,22,6,1,MAT.stone); solidBox(0,0,-44,22,6,1,MAT.stone);
+    for(let i=0;i<4;i++){ solidBox(-4.5,0,-8-i*5,5,.9,1,MAT.woodD); solidBox(4.5,0,-8-i*5,5,.9,1,MAT.woodD); }
+    solidBox(0,0,-38,6,1.1,2.4,MAT.stone);
+    for(let i=0;i<14;i++) candle(-8+(i%7)*2.6,1.15,-36-Math.floor(i/7)*2);
+    for(let i=0;i<8;i++) candle(-8.5,1,-4-i*4);
+    pl(0,4,-34,0xff8830,40,26); pl(0,5,-12,0xff7730,25,24); pl(0,3,-40,0x66ff66,14,10);
+    // containment cell: three walls + powered door, open side faces -x
+    solidBox(9.5,0,-34,1,4,6,MAT.metalD,{metal:true,cond:true});
+    solidBox(7,0,-37,6,4,1,MAT.metalD,{metal:true,cond:true});
+    solidBox(7,0,-31,6,4,1,MAT.metalD,{metal:true,cond:true});
+    const cellDoorMesh=box(4,0,-34,.4,3.4,5.4,MAT.metalD); // visual door (opens when sealed check passes)
+    mkOutlet(4.4,1.4,-29.5);
+    // syringe stations
+    const syr=[];
+    for(const [sx,sz] of [[-8,-20],[8,-24],[0,-6]]){ box(sx,0,sz,.6,1.1,.6,MAT.white); box(sx,1.1,sz,.3,.3,.3,MAT.greenlamp); syr.push({pos:new THREE.Vector3(sx,1,sz),used:false}); }
+    // the Minister
+    const bossMesh=(function(){ const g=new THREE.Group();
+      const robe=new THREE.Mesh(new THREE.CylinderGeometry(.34,.5,1.5,8),MAT.grig); robe.position.y=.75; g.add(robe);
+      const head=box(0,0,0,.3,.34,.3,MAT.flesh,g); head.position.y=1.7;
+      const lump=box(0,0,0,.34,.44,.34,MAT.acid,g); lump.position.set(.18,1.78,0);
+      const spike=box(0,0,0,.08,.5,.08,MAT.crab,g); spike.position.set(.2,2.1,0);
+      g.scale.setScalar(1.9); g.position.set(0,0,-36); world.add(g); return g; })();
+    const bossE={type:'boss',T:ETYPES.boss,hp:900,mesh:bossMesh,atkCd:0,zapCd:0,throwCd:0,hitT:0,dead:0,magnetized:0,walkP:0,vel:new THREE.Vector3(),distraction:null,boss:true};
+    setTimeout(()=>{ if(G.levelIndex!==5)return; subtitle('GRIGORI','(two voices at once) MY FLOCK. MY CHILDREN. ...run, Shephard... STAY.',6); },3500);
+    setTimeout(()=>{ if(G.levelIndex!==5)return; enemies.push(bossE); document.getElementById('choice').style.display='flex'; G.state='choice'; if(!QA) document.exitPointerLock&&document.exitPointerLock();
+      document.getElementById('choicetext').textContent='The venom has finished its work. Three ways out of Ravenholm. Pick one.';
+    },9000);
+    let mode=null;
+    document.getElementById('bcure').onclick=()=>{ mode='cure'; startChoice(); objective('Reach all 3 serum stations, then get close and inject him'); hint('He charges between stations. Use the pews. Repulse buys you seconds.',8); };
+    document.getElementById('bcontain').onclick=()=>{ mode='contain'; startChoice(); objective('Lure him into the containment cell, then power the door with a nail chain'); hint('Stand past the cell door. He will charge through you to get there.',8); };
+    document.getElementById('bkill').onclick=()=>{ mode='kill'; startChoice(); objective('End it.'); hint('Everything you have. Metal, nails, current. He feels all of it now.',8); };
+    function startChoice(){ document.getElementById('choice').style.display='none'; G.state='play'; if(!QA) canvas.requestPointerLock(); }
+    window.__finale={get mode(){return mode},syr,bossE,cureN:0,cellPos:new THREE.Vector3(7,0,-34)};
+    levelExtraArcs.push({a:new THREE.Vector3(4,1,-33),b:new THREE.Vector3(4,1,-35),active:false,t:0,cellDoor:true});
+    setInterval(()=>{ if(G.levelIndex!==5)return; for(const a of levelExtraArcs){ if(a.cellDoor) a.active=arcs.some(x=>x.active&&x!==a&&distPointSeg(new THREE.Vector3(4.4,1,-34),x.a,x.b)<2.5); } },400);
+    objective('Face the Minister');
+  }},
+];
+function finaleStep(dt){
+  const F=window.__finale; if(!F||G.levelIndex!==5||G.state!=='play') return;
+  const b=F.bossE;
+  if(F.mode==='kill' && b.hp<=0){ endGame('kill'); return; }
+  if(b.hp<=0) return;
+  if(F.mode==='cure'){
+    for(const s of F.syr){ if(!s.used&&PLAYER.pos.distanceTo(s.pos)<1.6){ s.used=true; F.cureN++; sfx('pickup'); spark(s.pos,0x66ff88,14); objective(`Serum synthesized: ${F.cureN}/3`); } }
+    if(F.syr.every(s=>s.used) && PLAYER.pos.distanceTo(b.mesh.position)<2.6){ endGame('cure'); }
+  }
+  if(F.mode==='contain'){
+    const inCell=Math.abs(b.mesh.position.x-7)<2.4&&Math.abs(b.mesh.position.z+34)<2.4;
+    if(inCell){
+      const sealed=levelExtraArcs.some(a=>a.cellDoor&&a.active);
+      if(sealed){ endGame('contain'); } else hint('The cell door needs current - chain nails from the outlet.',4);
+    }
+  }
+}
+
+// ============================================================ GAME FLOW
+const ENDINGS={
+  cure:{k:'ENDING I OF III',t:'THE MAN, NOT THE MINISTER',p:'Three doses. One steady hand. The venom drains out of him in the candlelight, and what is left is small, and tired, and human. He dies as Father Grigori - which is all he ever asked to be. Ravenholm keeps its silence. You carry him out of it.'},
+  contain:{k:'ENDING II OF III',t:'THE CANDLES STAY LIT',p:'The cell door seals on a sermon that never ends. He is alive in there, or something wearing him is. You leave the current running and the candles lit, and the town keeps its minister, and the minister keeps the town. Some doors should stay closed.'},
+  kill:{k:'ENDING III OF III',t:'A MARINE\'S MERCY',p:'You did what the Combine, the headcrabs and twenty years of stasis could not do to either of you: you ended it clean. The chapel is quiet. Somewhere below, the serum machine hums to no one. We don\'t go to Ravenholm. But you did.'},
+};
+function endGame(kind){
+  G.state='end'; if(!QA) document.exitPointerLock&&document.exitPointerLock();
+  const E=ENDINGS[kind];
+  document.getElementById('endk').textContent=E.k;
+  document.getElementById('endt').textContent=E.t;
+  document.getElementById('endp').textContent=E.p;
+  document.getElementById('endcard').style.display='flex';
+}
+function showCard(i){
+  G.cardLevel=i;
+  const L=LEVELS[i];
+  document.getElementById('lact').textContent=L.act;
+  document.getElementById('lname').textContent=L.name;
+  document.getElementById('ldesc').textContent=L.desc;
+  document.getElementById('lcard').style.display='flex';
+  G.state='card';
+}
+function startLevel(i){
+  clearWorld();
+  G.levelIndex=i; const L=LEVELS[i]; levelDef=L; levelTime=0;
+  scene.background=new THREE.Color(L.sky);
+  scene.fog=new THREE.Fog(L.fog[0],L.fog[1],L.fog[2]);
+  G.hp=100; G.absorb=100; G.lastHurt=-99;
+  G.yaw=L.yaw; G.pitch=0;
+  PLAYER.pos.set(L.start[0],L.start[1],L.start[2]); PLAYER.vel.set(0,0,0);
+  for(const w of G.weapons){ if(w.name==='NAIL GUN') w.ammo=Math.min(140,w.ammo+80); if(w.name==='SHOTGUN') w.ammo=Math.min(36,w.ammo+18); }
+  document.getElementById('lcard').style.display='none';
+  document.getElementById('title').style.display='none';
+  document.getElementById('deadcard').style.display='none';
+  L.build();
+  spawnCharm(L.start[0]+(L.start[0]>2?-3.2:3.2), L.start[2]-4);
+  updHUD(); waves('');
+  G.state='play';
+  const hemi=new THREE.HemisphereLight(L.interior?0x4a6a54:0x7a5a3a, 0x0e0c08, L.interior?1.45:1.3);
+  world.add(hemi);
+  const dir=new THREE.DirectionalLight(L.interior?0x88aa88:0xff8844, L.interior?.65:1.1);
+  if(L.interior) world.add(new THREE.AmbientLight(0x1c2a22,.55));
+  dir.position.set(18,40,12); world.add(dir);
+  document.getElementById('fade').style.opacity=0;
+  if(!QA) canvas.requestPointerLock();
+}
+function nextLevel(){
+  const n=G.levelIndex+1;
+  if(n>=LEVELS.length){ endGame('kill'); return; }
+  document.getElementById('fade').style.opacity=1;
+  G.state='trans';
+  setTimeout(()=>showCard(n),1100);
+}
+document.getElementById('startbtn').onclick=()=>{ drone(); sfx('pickup'); showCard(0); };
+document.getElementById('lgo').onclick=()=>startLevel(G.cardLevel);
+document.getElementById('retry').onclick=()=>startLevel(G.levelIndex);
+document.getElementById('endgo').onclick=()=>location.reload();
+
+// ============================================================ MAIN LOOP
+const clock=new THREE.Clock();
+function loop(){
+  requestAnimationFrame(loop);
+  const dt=Math.min(clock.getDelta(),.05);
+  G.time+=dt;
+  if(G.state==='play'){
+    levelTime+=dt;
+    playerStep(dt);
+    enemyStep(dt);
+    physStep(dt);
+    projStep(dt);
+    arcStep(dt);
+    trapStep(dt);
+    spawnStep(dt);
+    triggerStep();
+    npcStep(dt);
+    finaleStep(dt);
+    fogStep(dt);
+    ambientStep(dt);
+    charmStep(dt);
+    // slow regen after 6s calm
+    if(G.time-G.lastHurt>6 && G.hp<100 && G.hp>0){ G.hp=Math.min(100,G.hp+2.5*dt); updHUD(); }
+    // candle flicker
+    MAT.candle.emissiveIntensity=2.1+Math.sin(G.time*13)*.35+Math.sin(G.time*31)*.15;
+  }
+  muzzleStep(dt);
+  fxStep(dt);
+  renderer.render(scene,camera);
+}
+// lastHurt tracking
+const _hurt=hurtPlayer;
+hurtPlayer=(dmg,from,electric)=>{ G.lastHurt=G.time; _hurt(dmg,from,electric); };
+
+// ============================================================ BOOT
+document.getElementById('loadnote').style.display='none';
+document.getElementById('fade').style.opacity=0;
+if(QA){
+  document.getElementById('title').style.display='none';
+  const warp=+(qs.get('warp')||0);
+  if(warp>0){ G.weapons.push({...WDEFS[0]},{...WDEFS[1]},{...WDEFS[2]}); }
+  startLevel(Math.min(warp,LEVELS.length-1));
+  if(qs.get('cam')){ const c=qs.get('cam').split(',').map(Number); PLAYER.pos.set(c[0],c[1]-PLAYER.eye,c[2]); G.yaw=c[3]||0; G.pitch=c[4]||0; }
+  const qt=qs.get('qatest')||'';
+  const qf=+(qs.get('qaframes')||0);
+  if(qf){ for(let i=0;i<qf;i++){ const dt=1/60; G.time+=dt; levelTime+=dt; if(G.state==='play'){ playerStep(dt); enemyStep(dt); physStep(dt); projStep(dt); arcStep(dt); trapStep(dt); spawnStep(dt); triggerStep(); npcStep(dt); finaleStep(dt); fogStep(dt); ambientStep(dt); charmStep(dt); } } }
+  if(qt.startsWith('pick:')){ const btn={cure:'bcure',contain:'bcontain',kill:'bkill'}[qt.slice(5)]; setTimeout(()=>{ document.getElementById(btn).onclick(); for(let i=0;i<(+(qs.get("bake2")||700));i++){ const dt=1/60; G.time+=dt; levelTime+=dt; if(G.state==='play'){ playerStep(dt); enemyStep(dt); physStep(dt); projStep(dt); arcStep(dt); trapStep(dt); spawnStep(dt); triggerStep(); npcStep(dt); finaleStep(dt); fogStep(dt); ambientStep(dt); charmStep(dt); } } },9650); }
+  if(qt==='choice'){ document.getElementById('choice').style.display='flex'; G.state='choice'; }
+  if(qt==='charm' && charms.length){ const c=charms[0].g.position; PLAYER.pos.set(c.x,1.62-PLAYER.eye,c.z+1.7); G.yaw=0; G.pitch=-.1; }
+  if(qt.startsWith('end:')){ endGame(qt.slice(4)); }
+}
+loop();
+// QA self-tests: ?qatest=magnet drops a magnet point and reports prop physics; ?qatest=sim runs 20s and reports enemy/arc state
+if(qs.get('qatest')==='magnet'){
+  setTimeout(()=>{ magPoints.push({pos:new THREE.Vector3(0,1.2,-20),ttl:8,mesh:magOrb(),target:null});
+    setTimeout(()=>{ const speeds=props.map(p=>+p.vel.length().toFixed(1)); const mp=magPoints[0]; let mind=99,minP=null; for(const p of props){const d=p.pos.distanceTo(mp.pos); if(d<mind){mind=d;minP=p;}}
+      document.title='MAGTEST t='+G.time.toFixed(1)+' '+JSON.stringify({mps:magPoints.length,mind:+mind.toFixed(2),minV:+minP.vel.length().toFixed(2),metal:minP.metal,minPos:minP.pos.toArray().map(v=>+v.toFixed(1)),mpPos:mp.pos.toArray(),maxV:Math.max(...speeds)}); },3000);
+  },1500);
+}
+if(qs.get('qatest')==='sim'){
+  window.__minD=999; setInterval(()=>{ for(const e of enemies){ const d=e.mesh.position.distanceTo(PLAYER.pos); if(d<window.__minD) window.__minD=d; } },500);
+  setTimeout(()=>{ document.title='SIMTEST pp='+PLAYER.pos.toArray().map(v=>+v.toFixed(1)).join(',')+' e0='+enemies[0].mesh.position.toArray().map(v=>+v.toFixed(1)).join(',')+' v0='+enemies[0].vel.toArray().map(v=>+v.toFixed(1)).join(',')+' '+JSON.stringify({enemies:enemies.length,alive:enemies.filter(e=>e.hp>0).length,maxAlive:window.__maxAlive||0,hp:Math.round(G.hp),props:props.length,state:G.state,minEver:+window.__minD.toFixed(1),minD:+Math.min(...enemies.map(e=>e.mesh.position.distanceTo(PLAYER.pos))).toFixed(1),strafe:enemies.filter(e=>e.strafeT>0).length}); },20000);
+}
+</script>
+</body>
+</html>
