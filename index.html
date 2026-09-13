@@ -12,6 +12,10 @@
   #crosshair:before,#crosshair:after{content:"";position:absolute;background:#e8d9b0;opacity:.85;}
   #crosshair:before{left:6px;top:0;width:2px;height:14px;}
   #crosshair:after{left:0;top:6px;width:14px;height:2px;}
+  #hitmark{position:absolute;left:50%;top:50%;width:18px;height:18px;transform:translate(-50%,-50%) rotate(45deg);opacity:0;pointer-events:none;}
+  #hitmark:before,#hitmark:after{content:"";position:absolute;background:#fff2d8;}
+  #hitmark:before{left:8px;top:0;width:2px;height:18px;}
+  #hitmark:after{left:0;top:8px;width:18px;height:2px;}
   .panel{position:absolute;color:#e8d9b0;text-shadow:0 0 6px #000,0 2px 2px #000;}
   #vitals{left:22px;bottom:20px;font-size:13px;letter-spacing:1px;}
   .barwrap{width:210px;height:13px;background:#14100b;border:1px solid #5a4a30;margin-top:5px;position:relative;}
@@ -42,6 +46,10 @@
   #lcard h1{font-size:38px;}
   #endcard{display:none;}
   #choice{display:none;}
+  #bossbar{position:absolute;left:50%;bottom:86px;transform:translateX(-50%);width:340px;display:none;text-align:center;}
+  #bossbar .bn{font-size:10px;letter-spacing:.4em;color:#d8b060;text-transform:uppercase;margin-bottom:5px;}
+  #bossbar .bt{height:5px;background:rgba(216,176,96,.18);border:1px solid rgba(216,176,96,.45);}
+  #bossbar .bf{height:100%;width:100%;background:linear-gradient(90deg,#8a1e10,#c9962e);transition:width .15s;}
   .cbtn{pointer-events:auto;cursor:pointer;border:1px solid #6a5228;background:rgba(30,20,8,.85);color:#e8d9b0;font-size:14px;letter-spacing:3px;padding:14px 30px;margin:9px;width:340px;}
   .cbtn:hover{background:rgba(90,50,16,.9);box-shadow:0 0 18px rgba(255,140,40,.35);}
   .cbtn small{display:block;font-size:10px;color:#a08858;letter-spacing:1px;margin-top:5px;}
@@ -54,10 +62,12 @@
 <div id="fade"></div>
 <div id="hud">
   <div id="crosshair"></div>
+  <div id="hitmark"></div>
   <div id="dmgvin"></div><div id="zapvin"></div>
   <div id="vitals" class="panel">
     <div class="blabel">VITALS</div><div class="barwrap"><div class="bar" id="hpbar"></div></div>
     <div class="blabel">ABSORPTION</div><div class="barwrap"><div class="bar" id="absbar"></div></div>
+    <div class="blabel" style="margin-top:7px;color:#c9962e">LUCK&nbsp;&nbsp;<span id="luckn">0</span>/6</div>
   </div>
   <div id="ammo" class="panel"><div id="wname">MAGNET GUN</div><div id="wcount">--</div><div id="wmode">ATTRACT</div></div>
   <div id="objective" class="panel"></div>
@@ -73,6 +83,7 @@
   <div class="go" id="startbtn">ENTER RAVENHOLM</div>
 </div>
 <div id="lcard" class="screen"><h2 id="lact"></h2><h1 id="lname"></h1><p id="ldesc"></p><div class="go" id="lgo">BEGIN</div></div>
+<div id="bossbar"><div class="bn">The Minister</div><div class="bt"><div class="bf" id="bossfill"></div></div></div>
 <div id="choice" class="screen"><h2>THE MINISTER</h2><p id="choicetext"></p>
   <div class="cbtn" id="bcure">CURE HIM<small> synthesize the antidote - the man deserves an ending</small></div>
   <div class="cbtn" id="bcontain">CONTAIN HIM<small> power the containment cell - alive, but caged</small></div>
@@ -201,6 +212,8 @@ const MAT = {
   _x:0,
   white: new THREE.MeshStandardMaterial({color:0xc8c4bc, roughness:.8}),
   water: new THREE.MeshStandardMaterial({color:0x1a3a30, roughness:.15, metalness:.3, transparent:true, opacity:.75}),
+  sheet: new THREE.MeshStandardMaterial({color:0xa39a82, roughness:1}),
+  cloth: new THREE.MeshStandardMaterial({color:0x6e1810, roughness:.95}),
 };
 MAT.stone.map=grimeTex(1); MAT.stoneD.map=grimeTex(1); MAT.plaster.map=grimeTex(1); MAT.plasterG.map=grimeTex(1);
 MAT.wood.map=plankTex(); MAT.woodD.map=plankTex(); MAT.rust.map=rustTex(); MAT.metalD.map=grimeTex(0);
@@ -218,10 +231,149 @@ function mkBarrel(x,y,z){ const m=new THREE.Mesh(new THREE.CylinderGeometry(.34,
 function mkFridge(x,y,z){ const g=new THREE.Group(); const b=box(0,0,0,1.1,1.9,.9,MAT.metal,g); b.position.set(0,.95,0); const door=box(0,0,0,.06,1.7,.8,MAT.metalD,g); door.position.set(.56,.95,0); world.add(g); return addProp(g,new THREE.Vector3(.6,.95,.5),85,true,new THREE.Vector3(x,y+.95,z),true); }
 function mkSawblade(x,y,z){ const m=new THREE.Mesh(new THREE.CylinderGeometry(.55,.55,.06,14), MAT.metal); world.add(m); return addProp(m,new THREE.Vector3(.55,.05,.55),12,true,new THREE.Vector3(x,y+.4,z),true); }
 function mkCart(x,y,z){ const g=new THREE.Group(); const bed=box(0,0,0,1.5,.08,.7,MAT.metal,g); bed.position.y=.6; for(const [sx,sz] of [[-.6,-.25],[.6,-.25],[-.6,.25],[.6,.25]]){ const w2=new THREE.Mesh(new THREE.CylinderGeometry(.12,.12,.06,8),MAT.black); w2.rotation.z=Math.PI/2; w2.position.set(sx,.12,sz); g.add(w2);} const leg=box(0,0,0,1.3,.5,.5,MAT.metalD,g); leg.position.y=.35; world.add(g); return addProp(g,new THREE.Vector3(.75,.35,.35),30,true,new THREE.Vector3(x,y+.4,z),true); }
+function mkGurney(x,z,rot=0){ const g=new THREE.Group();
+  const frame=box(0,0,0,1.7,.07,.75,MAT.rust,g); frame.position.y=.62;
+  const matt=box(0,0,0,1.6,.14,.68,MAT.sheet,g); matt.position.y=.73;
+  for(const [sx,sz] of [[-.72,-.28],[.72,-.28],[-.72,.28],[.72,.28]]){
+    const leg=box(0,0,0,.06,.55,.06,MAT.metalD,g); leg.position.set(sx,.32,sz);
+    const wh=new THREE.Mesh(new THREE.CylinderGeometry(.09,.09,.05,8),MAT.black); wh.rotation.x=Math.PI/2; wh.position.set(sx,.09,sz); g.add(wh); }
+  const rail=box(0,0,0,.05,.3,.7,MAT.rust,g); rail.position.set(-.82,.8,0);
+  g.rotation.y=rot; g.position.set(x,0,z); world.add(g);
+  addStatic(x,0,z,Math.abs(Math.cos(rot))*1.8+Math.abs(Math.sin(rot))*.8,.85,Math.abs(Math.sin(rot))*1.8+Math.abs(Math.cos(rot))*.8,{}); return g; }
+function mkCurtain(x,z,w=2.4){ const g=new THREE.Group();
+  const rail=box(0,0,0,w,.05,.05,MAT.metalD,g); rail.position.y=2.55;
+  const panel=box(0,0,0,w-.15,1.9,.05,MAT.sheet,g); panel.position.y=1.55;
+  for(let i=0;i<4;i++){ const ring=box(0,0,0,.06,.09,.06,MAT.rust,g); ring.position.set(-w/2+.3+i*(w-.6)/3,2.5,0); }
+  g.position.set(x,0,z); world.add(g); addStatic(x,0,z,w,2.6,.15,{}); return g; }
 function mkIBeam(x,y,z,long=4){ const g=new THREE.Group(); const b=box(0,0,0,.3,.3,long,MAT.rust,g); world.add(g); return addProp(g,new THREE.Vector3(.18,.18,long/2),60,true,new THREE.Vector3(x,y+.4,z),true); }
 function mkChair(x,y,z){ const g=new THREE.Group(); const s=box(0,0,0,.45,.05,.45,MAT.wood,g); s.position.y=.45; const b=box(0,0,0,.45,.5,.05,MAT.wood,g); b.position.set(0,.75,-.2); const l=box(0,0,0,.4,.45,.4,MAT.woodD,g); l.position.y=.22; world.add(g); return addProp(g,new THREE.Vector3(.25,.4,.25),6,false,new THREE.Vector3(x,y+.4,z)); }
 function mkTV(x,y,z){ const g=new THREE.Group(); const b=box(0,0,0,.6,.5,.5,MAT.black,g); b.position.y=.25; world.add(g); return addProp(g,new THREE.Vector3(.3,.25,.25),14,true,new THREE.Vector3(x,y+.3,z),true); }
 function mkDumpster(x,y,z){ const g=new THREE.Group(); const b=box(0,0,0,2.1,1.2,1.1,MAT.metalD,g); b.position.y=.7; const lid=box(0,0,0,2.1,.08,1.15,MAT.rust,g); lid.position.y=1.34; world.add(g); return addProp(g,new THREE.Vector3(1.05,.7,.55),120,true,new THREE.Vector3(x,y+.7,z),true); }
+
+// ---------- v16 town/churchyard dressing
+const WINLIT=new THREE.MeshStandardMaterial({color:0xffd9a0, emissive:0xff8830, emissiveIntensity:.5, roughness:.6});
+const LAMPM=new THREE.MeshStandardMaterial({color:0xffe0b0, emissive:0xff9944, emissiveIntensity:1.9});
+function mkFacade(cx,cz,w,d,h,dir){
+  const fx=cx+dir*(w/2+.045);
+  for(let zz=cz-d/2+1.5; zz<=cz+d/2-1.4; zz+=2.4){
+    for(let yy=2.2; yy<h-.9; yy+=2.1){
+      const r=Math.abs((Math.sin(cx*12.9898+zz*78.233+yy*37.719)*43758.5453)%1);
+      box(fx,yy,zz,.07,1.15,.85, r<.16?WINLIT:MAT.black);
+      box(fx+dir*.01,yy+1.15,zz,.09,.09,.98,MAT.woodD);
+      if(yy<3 && r>.8){
+        const p1=box(fx+dir*.06,yy+.05,zz,.06,.16,1.05,MAT.woodD); p1.rotation.x=.28;
+        const p2=box(fx+dir*.06,yy+.62,zz,.06,.16,1.0,MAT.wood); p2.rotation.x=-.22;
+      }
+    }
+  }
+}
+function mkStreetlamp(x,z,face=1,lit=false,lean=0){
+  const g=new THREE.Group();
+  const pole=new THREE.Mesh(new THREE.CylinderGeometry(.07,.12,5,7),MAT.metalD); pole.position.y=2.5; g.add(pole);
+  const arm=box(0,0,0,1.15,.08,.08,MAT.metalD,g); arm.position.set(.5*face,4.85,0);
+  const head=box(0,0,0,.36,.24,.24,lit?LAMPM:MAT.metalD,g); head.position.set(1.02*face,4.66,0);
+  g.rotation.z=lean*face; g.position.set(x,0,z); world.add(g);
+  addStatic(x,0,z,.34,5,.34,{metal:true});
+  if(lit) pl(x+face*(1.02-lean*4.4),4.3,z,0xff9944,13,11);
+}
+function mkWire(x1,y1,z1,x2,y2,z2,sag=1.1){
+  const pts=[]; for(let i=0;i<=14;i++){ const t=i/14; pts.push(new THREE.Vector3(x1+(x2-x1)*t, y1+(y2-y1)*t - sag*4*t*(1-t), z1+(z2-z1)*t)); }
+  world.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({color:0x060606})));
+}
+function mkWreckCar(x,z,rot=0){
+  const g=new THREE.Group();
+  const body=box(0,0,0,3.4,.6,1.5,MAT.rust,g); body.position.y=.32;
+  const cab=box(-.2,0,0,1.7,.55,1.3,MAT.metalD,g); cab.position.y=.85;
+  for(const [wx,wz] of [[-1.15,-.78],[1.15,-.78],[-1.15,.78],[1.15,.78]]){ const wh=new THREE.Mesh(new THREE.CylinderGeometry(.3,.3,.2,10),MAT.black); wh.rotation.x=Math.PI/2; wh.position.set(wx,.3,wz); g.add(wh); }
+  g.rotation.y=rot; g.rotation.z=.03; g.position.set(x,0,z); world.add(g);
+  addStatic(x,0,z,3.2,1.4,1.7,{metal:true});
+}
+function mkHangSign(x,z,face=1){
+  box(x+face*.5,3.0,z,1.0,.07,.07,MAT.metalD);
+  box(x+face*.92,2.58,z,.03,.4,.03,MAT.metalD);
+  box(x+face*.92,1.95,z,.95,.62,.07,MAT.wood);
+}
+function mkCrossStone(x,z,rot=0){
+  const a=box(x,0,z,.15,1.0,.15,MAT.stone); a.rotation.y=rot;
+  const b=box(x,.62,z,.55,.15,.15,MAT.stone); b.rotation.y=rot;
+  addStatic(x,0,z,.5,1,.2,{});
+}
+function mkCrypt(x,z,rot=0){
+  const g=new THREE.Group();
+  box(0,0,0,3.2,2.5,4.2,MAT.stone,g);
+  const r1=box(-.78,2.5,0,1.9,.16,4.4,MAT.stoneD,g); r1.rotation.z=.5;
+  const r2=box(.78,2.5,0,1.9,.16,4.4,MAT.stoneD,g); r2.rotation.z=-.5;
+  box(0,0,2.12,1.1,1.9,.1,MAT.black,g);
+  box(0,0,2.35,1.5,.25,.5,MAT.stoneD,g);
+  g.rotation.y=rot; g.position.set(x,0,z); world.add(g);
+  addStatic(x,0,z,3.4,3.2,4.4,{});
+}
+function mkGallows(x,z,rot=0){
+  const g=new THREE.Group();
+  const post=new THREE.Mesh(new THREE.CylinderGeometry(.09,.13,4.6,6),MAT.woodD); post.position.y=2.3; g.add(post);
+  box(.8,4.45,0,1.9,.14,.14,MAT.woodD,g);
+  box(1.5,3.55,0,.04,.95,.04,MAT.metalD,g);
+  const cage=new THREE.Group();
+  box(0,0,0,.7,.06,.7,MAT.rust,cage);
+  for(const [cx,cz] of [[-.32,-.32],[.32,-.32],[-.32,.32],[.32,.32]]) box(cx,.06,cz,.05,.75,.05,MAT.rust,cage);
+  box(0,.81,0,.7,.06,.7,MAT.rust,cage);
+  cage.position.set(1.5,2.7,0); cage.rotation.y=.4; g.add(cage);
+  g.rotation.y=rot; g.position.set(x,0,z); world.add(g);
+  addStatic(x,0,z,.4,4.6,.4,{});
+}
+function mkMound(x,z,rot=0){ const m=box(x,0,z,1.9,.24,.85,MAT.rotDark); m.rotation.y=rot; }
+function mkShovel(x,z,lean=.4){
+  const g2=new THREE.Group();
+  const sh=new THREE.Mesh(new THREE.CylinderGeometry(.025,.025,1.3,5),MAT.wood); sh.position.y=.85; g2.add(sh);
+  box(0,.55,0,.18,.3,.05,MAT.metalD,g2);
+  g2.rotation.z=lean; g2.position.set(x,0,z); world.add(g2);
+}
+function mkShrub(x,z){
+  const r=.45+Math.abs((Math.sin(x*13.7+z*7.1)*9.4)%1)*.35;
+  const sh=new THREE.Mesh(new THREE.SphereGeometry(r,6,4),MAT.rotDark); sh.scale.y=.55; sh.position.set(x,r*.4,z); world.add(sh);
+}
+function mkIronArch(x,z,w=4.5){
+  solidBox(x-w/2,0,z,.18,3.2,.18,MAT.metalD,{metal:true});
+  solidBox(x+w/2,0,z,.18,3.2,.18,MAT.metalD,{metal:true});
+  box(x,3.2,z,w+.3,.16,.16,MAT.metalD);
+}
+
+// ---------- v19: hospital dressing helpers
+const tileM=new THREE.MeshStandardMaterial({color:0xd8dcd4,roughness:.35});
+tileM.map=texCanvas(x=>{ x.fillStyle='#ccd2c6'; x.fillRect(0,0,128,128); x.strokeStyle='#98a094'; x.lineWidth=2; for(let i=0;i<=4;i++){ x.beginPath(); x.moveTo(i*32,0); x.lineTo(i*32,128); x.stroke(); x.beginPath(); x.moveTo(0,i*32); x.lineTo(128,i*32); x.stroke(); } });
+tileM.map.repeat.set(34,1);
+function plaqueTex(text,sub){ const c=document.createElement('canvas'); c.width=256; c.height=sub?96:56; const x=c.getContext('2d');
+  x.fillStyle='#cfc9b6'; x.fillRect(0,0,256,c.height);
+  x.fillStyle='rgba(70,72,58,.25)'; for(let i=0;i<34;i++) x.fillRect(rnd()*256,rnd()*c.height,rnd()*3+1,rnd()*2+1);
+  x.strokeStyle='#2e4a3a'; x.lineWidth=4; x.strokeRect(5,5,246,c.height-10);
+  x.fillStyle='#233f2d'; x.textAlign='center'; x.textBaseline='middle';
+  if(sub){ x.font='bold 30px Georgia'; x.fillText(text,128,36); x.font='17px Georgia'; x.fillText(sub,128,72); }
+  else { x.font='bold 28px Georgia'; x.fillText(text,128,c.height/2+1); }
+  return new THREE.CanvasTexture(c); }
+function plaque(x,y,z,text,ry=0,sub){ const w=sub?1.7:1.35,h=sub?.64:.3; const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshStandardMaterial({map:plaqueTex(text,sub),roughness:.55})); m.position.set(x,y,z); m.rotation.y=ry; world.add(m); return m; }
+function pipe(x,y,z,len,axis='z',r=.06){ const m=new THREE.Mesh(new THREE.CylinderGeometry(r,r,len,7),MAT.rust); if(axis==='z') m.rotation.x=Math.PI/2; else if(axis==='x') m.rotation.z=Math.PI/2; m.position.set(x,y,z); world.add(m); return m; }
+function valve(x,y,z){ const m=new THREE.Mesh(new THREE.TorusGeometry(.14,.032,6,12),MAT.rust); m.position.set(x,y,z); m.rotation.y=Math.PI/2; world.add(m); return m; }
+function stain(x,y,z,h=1.5,ry=0){ const m=new THREE.Mesh(new THREE.PlaneGeometry(.16,h),new THREE.MeshStandardMaterial({color:0x33200f,roughness:1,transparent:true,opacity:.5})); m.position.set(x,y,z); m.rotation.y=ry; world.add(m); return m; }
+function mkLadder(x,z,ry=0){ const g=new THREE.Group(); for(const sx of [-.24,.24]){ const r2=new THREE.Mesh(new THREE.CylinderGeometry(.03,.03,1.35,6),MAT.metal); r2.position.set(sx,.67,0); g.add(r2); } for(let i=0;i<3;i++){ const rg=new THREE.Mesh(new THREE.CylinderGeometry(.022,.022,.42,6),MAT.metal); rg.rotation.z=Math.PI/2; rg.position.set(0,.3+i*.32,0); g.add(rg); } g.position.set(x,0,z); g.rotation.y=ry; world.add(g); return g; }
+function mkLocker(x,z){ const g=new THREE.Group(); box(0,0,0,1.55,1.9,.5,MAT.metalD,g);
+  for(let i=0;i<3;i++){ const d=box(0,0,0,.46,1.72,.05,MAT.metal,g); d.position.set(-.5+i*.5,1,.26);
+    for(let v=0;v<3;v++){ const s2=box(0,0,0,.3,.025,.02,MAT.black,d); s2.position.set(0,.5-v*.14,.035); } }
+  g.position.set(x,0,z); world.add(g); addStatic(x,0,z,1.55,1.9,.5,{}); return g; }
+function mkBench(x,z,ry=0){ const g=new THREE.Group(); const st=box(0,0,0,1.8,.07,.42,MAT.wood,g); st.position.y=.46; const bk=box(0,0,0,1.8,.42,.06,MAT.wood,g); bk.position.set(0,.83,-.18);
+  for(const sx of [-.72,.72]){ const lg=box(0,0,0,.09,.46,.38,MAT.metalD,g); lg.position.set(sx,.23,0); }
+  g.position.set(x,0,z); g.rotation.y=ry; world.add(g); return g; }
+function mkDrain(x,z){ const m=new THREE.Mesh(new THREE.CylinderGeometry(.2,.2,.03,12),MAT.black); m.position.set(x,.015,z); world.add(m); return m; }
+function puddle(x,z,r=.8){ const m=new THREE.Mesh(new THREE.CircleGeometry(r,10),MAT.water); m.rotation.x=-Math.PI/2; m.position.set(x,.012+r*.003,z); world.add(m); return m; }
+function mkLabTable(x,z,ry=0){ const g=new THREE.Group(); const top=box(0,0,0,1.9,.07,.85,MAT.metal,g); top.position.y=.92; const shelf=box(0,0,0,1.7,.05,.7,MAT.metalD,g); shelf.position.y=.3;
+  for(const [sx,sz] of [[-.85,-.35],[.85,-.35],[-.85,.35],[.85,.35]]){ const l=box(0,0,0,.06,.92,.06,MAT.metalD,g); l.position.set(sx,.46,sz); }
+  g.position.set(x,0,z); g.rotation.y=ry; world.add(g); return g; }
+const jarM=new THREE.MeshStandardMaterial({color:0x7a9a66,transparent:true,opacity:.55,roughness:.2});
+function mkShelf(x,z,ry=0){ const g=new THREE.Group();
+  for(const sx of [-.8,.8]){ const u=box(0,0,0,.08,2,.35,MAT.woodD,g); u.position.set(sx,1,0); }
+  for(let i=0;i<3;i++){ const sh=box(0,0,0,1.7,.05,.35,MAT.wood,g); sh.position.set(0,.5+i*.55,0); }
+  for(let i=0;i<5;i++){ const j=new THREE.Mesh(new THREE.CylinderGeometry(.09,.09,.26,7),jarM); j.position.set(-.6+i*.3,.63+ (i%2)*.55,.02); g.add(j); }
+  g.position.set(x,0,z); g.rotation.y=ry; world.add(g); return g; }
+function bloodStain(x,z,r=.7){ const m=new THREE.Mesh(new THREE.CircleGeometry(r,9),new THREE.MeshStandardMaterial({color:0x4a0e06,roughness:1,transparent:true,opacity:.55})); m.rotation.x=-Math.PI/2; m.position.set(x,.014+r*.002,z); world.add(m); return m; }
 
 // ============================================================ PHYSICS
 const GRAV=-22;
@@ -297,6 +449,12 @@ function fxStep(dt){ for(let i=parts.length-1;i>=0;i--){ const p=parts[i]; p.ttl
 let muzzle=null;
 function muzzleFlash(){ if(!muzzle){ muzzle=new THREE.PointLight(0xffaa44,0,9); scene.add(muzzle); } muzzle.position.copy(eyePos()).addScaledVector(lookDir(),1); muzzle.intensity=40; }
 function muzzleStep(dt){ if(muzzle&&muzzle.intensity>0) muzzle.intensity=Math.max(0,muzzle.intensity-400*dt); }
+let hitL=null;
+function hitFlashAt(pos,kill){ if(QA&&!window.__hitok) return; if(!hitL){ hitL=new THREE.PointLight(0xffddaa,0,7); scene.add(hitL); } hitL.position.copy(pos); hitL.position.y+=1.2; hitL.intensity=kill?55:22; hitL.color.setHex(kill?0xff7744:0xffddaa); }
+function hitLStep(dt){ if(hitL&&hitL.intensity>0&&!window.__hitfreeze) hitL.intensity=Math.max(0,hitL.intensity-320*dt); }
+let hitmarkT=0;
+function hitmark(){ hitmarkT=.14; const h=document.getElementById('hitmark'); if(h) h.style.opacity=.95; }
+function hitmarkStep(dt){ if(window.__hitfreeze) return; if(hitmarkT>0){ hitmarkT-=dt; if(hitmarkT<=0){ const h=document.getElementById('hitmark'); if(h) h.style.opacity=0; } } }
 
 // ============================================================ ENEMIES
 const ETYPES={
@@ -322,21 +480,22 @@ function spawnEnemy(type,x,z){
   if(type==='elec'){ const arc1=box(0,0,0,.1,1.9,.1,MAT.elec,g); arc1.position.y=1.1; }
   g.position.set(x,0,z);
   world.add(g);
-  const e={type,T,hp:T.hp,mesh:g,atkCd:0,zapCd:0,throwCd:0,hitT:0,dead:0,magnetized:0,walkP:Math.random()*9,vel:new THREE.Vector3(),distraction:null,boss:type==='boss'};
+  const e={type,T,hp:T.hp,mesh:g,atkCd:0,zapCd:0,throwCd:0,hitT:0,dead:0,magnetized:0,walkP:Math.random()*9,vel:new THREE.Vector3(),distraction:null,boss:type==='boss',baseScale:type==='crab'?.7:1,pop:0};
   enemies.push(e); return e;
 }
 function damageEnemy(e,dmg,kb){
   if(e.hp<=0) return;
-  e.hp-=dmg; e.hitT=.15; blood(e.mesh.position.clone().add(new THREE.Vector3(0,1,0)));
+  e.hp-=dmg; e.hitT=.15; e.pop=1; blood(e.mesh.position.clone().add(new THREE.Vector3(0,1,0)));
+  hitmark(); hitFlashAt(e.mesh.position,e.hp-dmg<=0);
   if(kb) e.vel.add(kb);
-  if(e.hp<=0){ e.dead=.001; sfx('hit'); gore(e.mesh.position.clone().add(new THREE.Vector3(0,1,0))); }
+  if(e.hp<=0){ e.dead=.001; sfx('hit'); gore(e.mesh.position.clone().add(new THREE.Vector3(0,1,0))); G.hitstop=.06; cameraShake(.55); }
 }
 function enemyStep(dt){
   const pp=PLAYER.pos;
   for(let i=enemies.length-1;i>=0;i--){
     const e=enemies[i];
     if(e.dead>0){ e.dead+=dt; e.mesh.rotation.x=Math.min(Math.PI/2,(e.dead)*4); e.mesh.position.y=Math.max(-1.2,-e.dead*.5); if(e.dead>2.2){ world.remove(e.mesh); enemies.splice(i,1);} continue; }
-    e.hitT=Math.max(0,e.hitT-dt); e.atkCd-=dt; e.zapCd-=dt; e.throwCd-=dt;
+    e.hitT=Math.max(0,e.hitT-dt); if(!window.__hitfreeze){ e.pop=Math.max(0,(e.pop||0)-dt*5); e.mesh.scale.setScalar((e.baseScale||1)*(1+e.pop*.16)); } e.atkCd-=dt; e.zapCd-=dt; e.throwCd-=dt;
     const ep=e.mesh.position;
     let target=pp;
     if(e.distraction && e.distraction.ttl>0){ e.distraction.ttl-=dt; target=e.distraction.pos; }
@@ -351,12 +510,13 @@ function enemyStep(dt){
       e.vel.x+=dir.x*e.T.spd*3*dt; e.vel.z+=dir.z*e.T.spd*3*dt;
       if(e.strafeT>0){ e.strafeT-=dt; const px=-dir.z*(e.strafe||1), pz=dir.x*(e.strafe||1);
         e.vel.x+=px*e.T.spd*3*dt; e.vel.z+=pz*e.T.spd*3*dt; }
-      const sp=Math.hypot(e.vel.x,e.vel.z), max=e.T.spd;
+      const sp=Math.hypot(e.vel.x,e.vel.z), max=e.T.spd*((e.boss&&e.enrage)?1.28:1);
       if(sp>max){ e.vel.x*=max/sp; e.vel.z*=max/sp; }
       e.mesh.rotation.y=Math.atan2(dir.x,dir.z);
     } else { e.vel.x*=.8; e.vel.z*=.8; }
-    if(e.T.ranged && dist<14 && e.atkCd<=0){ e.atkCd=2.4; spitAcid(ep,pp); }
+    if(e.T.ranged && dist<14 && e.atkCd<=0){ e.atkCd=3.0; spark(ep.clone().add(new THREE.Vector3(0,1.6,0)),0x7aba3a,3); spitAcid(ep,pp); }
     if(e.T.thrower && dist<10 && e.throwCd<=0){ e.throwCd=3.2; monkeyThrow(ep); }
+    if(e.boss && dist>6 && dist<18 && e.throwCd<=0){ e.throwCd=3.6; spark(ep.clone().add(new THREE.Vector3(0,2.6,0)),0x7aba3a,4); spitAcid(ep,pp); }
     if(e.T.leap && dist<4 && dist>1.6 && e.atkCd<=0){ e.atkCd=1.6; e.vel.y=5.5; e.vel.x+=Math.sign(d.x)*3; e.vel.z+=Math.sign(d.z)*3; }
     if(dist<e.T.range && e.atkCd<=0){ e.atkCd=1.1; if(e.boss) e.lunge=.35; hurtPlayer(e.T.dmg,ep); }
     if(e.T.zap && e.zapCd<=0){
@@ -401,8 +561,8 @@ function enemyStep(dt){
 }
 function distPointSeg(p,a,b){ const ab=new THREE.Vector3().subVectors(b,a); const t=Math.max(0,Math.min(1,new THREE.Vector3().subVectors(p,a).dot(ab)/ab.lengthSq())); return new THREE.Vector3().copy(a).addScaledVector(ab,t).distanceTo(p); }
 const projectiles=[];
-function spitAcid(from,to){ const m=new THREE.Mesh(new THREE.SphereGeometry(.14,6,6),MAT.acid); m.position.copy(from).add(new THREE.Vector3(0,1.5,0)); fxGroup.add(m); const v=new THREE.Vector3().subVectors(to,m.position).normalize().multiplyScalar(11); v.y+=2.5; projectiles.push({mesh:m,vel:v,kind:'acid',ttl:3}); }
-function monkeyThrow(from){ const m=box(0,0,0,.3,.3,.3,MAT.wood,fxGroup); m.position.copy(from).add(new THREE.Vector3(0,1,0)); const v=new THREE.Vector3().subVectors(PLAYER.pos,m.position).normalize().multiplyScalar(12); v.y+=3; projectiles.push({mesh:m,vel:v,kind:'junk',ttl:3}); sfx('melee'); }
+function spitAcid(from,to){ const m=new THREE.Mesh(new THREE.SphereGeometry(.14,6,6),MAT.acid); m.position.copy(from).add(new THREE.Vector3(0,1.5,0)); fxGroup.add(m); const v=new THREE.Vector3().subVectors(to,m.position).normalize().multiplyScalar(9.5); v.y+=2.5; projectiles.push({mesh:m,vel:v,kind:'acid',ttl:3}); }
+function monkeyThrow(from){ const m=box(0,0,0,.3,.3,.3,MAT.wood,fxGroup); m.position.copy(from).add(new THREE.Vector3(0,1,0)); const v=new THREE.Vector3().subVectors(PLAYER.pos,m.position).normalize().multiplyScalar(10.5); v.y+=3; projectiles.push({mesh:m,vel:v,kind:'junk',ttl:3}); sfx('melee'); }
 function projStep(dt){ for(let i=projectiles.length-1;i>=0;i--){ const p=projectiles[i]; p.ttl-=dt; p.vel.y+=GRAV*.6*dt; p.mesh.position.addScaledVector(p.vel,dt); const mp=p.mesh.position;
   if(mp.distanceToSquared(PLAYER.pos)<.8){ hurtPlayer(p.kind==='acid'?14:8,mp); fxGroup.remove(p.mesh); projectiles.splice(i,1); continue; }
   if(mp.y<0||p.ttl<=0){ if(p.kind==='acid'){ spark(mp,0x7aba3a,8); if(mp.distanceToSquared(PLAYER.pos)<2.2) hurtPlayer(10,mp); } fxGroup.remove(p.mesh); projectiles.splice(i,1); } } }
@@ -410,6 +570,45 @@ function projStep(dt){ for(let i=projectiles.length-1;i>=0;i--){ const p=project
 // ============================================================ TRAPS / ELECTRICITY
 function mkBladeTrap(x,z){ const g=new THREE.Group(); const pole=box(0,0,0,.15,1.1,.15,MAT.metalD,g); pole.position.y=.55; const hub=new THREE.Group(); hub.position.y=1.15; for(let k=0;k<3;k++){ const bl=box(0,0,0,1.9,.05,.22,MAT.metal,hub); bl.rotation.y=k*Math.PI/3; } g.add(hub); g.position.set(x,0,z); world.add(g); const t={kind:'blade',mesh:g,hub,spin:0,pos:new THREE.Vector3(x,1.15,z),held:false}; traps.push(t); inters.push({pos:new THREE.Vector3(x,1,z),r:2.2,label:'E - grab / place blade trap',act(){ t.held=!t.held; }}); return t; }
 const powerSources=[];
+function stainedGlass(x,y,z,wd,ht){ const g=new THREE.Group();
+  const cols=4, rows=5, pw=wd/cols, ph=ht/rows;
+  const palette=[0xd9822b,0x9e2b1e,0x4a7a3a,0x2b5a8a,0xc9a02e];
+  for(let r=0;r<rows;r++) for(let c=0;c<cols;c++){
+    const col=palette[((r*cols+c)*7+((r+c)%3))%palette.length];
+    const p=box(0,0,0,pw-.07,ph-.07,.06,new THREE.MeshStandardMaterial({color:col,emissive:col,emissiveIntensity:.85,roughness:.6}),g);
+    p.position.set(-wd/2+pw/2+c*pw, ph/2+r*ph, 0); }
+  box(0,0,0,wd+.3,.16,.12,MAT.stoneD,g).position.set(0,-.08,0);
+  box(0,0,0,wd+.3,.16,.12,MAT.stoneD,g).position.set(0,ht+.08,0);
+  box(0,0,0,.16,ht+.3,.12,MAT.stoneD,g).position.set(-wd/2-.08,ht/2,0);
+  box(0,0,0,.16,ht+.3,.12,MAT.stoneD,g).position.set(wd/2+.08,ht/2,0);
+  g.position.set(x,y,z); world.add(g); return g; }
+function chandelier(x,y,z){ const g=new THREE.Group();
+  const ring=new THREE.Mesh(new THREE.TorusGeometry(1.15,.07,6,18),MAT.rust); ring.rotation.x=Math.PI/2; g.add(ring);
+  for(let i=0;i<8;i++){ const a=i/8*Math.PI*2, cx=Math.cos(a)*1.15, cz=Math.sin(a)*1.15;
+    const cd=box(0,0,0,.09,.22,.09,MAT.candle,g); cd.position.set(cx,.16,cz); }
+  for(let i=0;i<3;i++){ const a=i/3*Math.PI*2, cx=Math.cos(a)*1.0, cz=Math.sin(a)*1.0;
+    const ch=box(0,0,0,.04,2.4,.04,MAT.metalD,g); ch.position.set(cx,1.3,cz); }
+  g.position.set(x,y,z); world.add(g); return g; }
+function banner(x,z,face){ const g=new THREE.Group();
+  const rod=box(0,0,0,.06,.06,1.6,MAT.woodD,g); rod.position.y=3.1;
+  const cloth=box(0,0,0,.05,2.2,1.3,MAT.cloth,g); cloth.position.y=1.95;
+  const fringe=box(0,0,0,.06,.1,1.34,MAT.rust,g); fringe.position.y=.82;
+  const glyph=box(0,0,0,.06,.5,.3,MAT.candle,g); glyph.position.set(0,2.1,0);
+  g.position.set(x,0,z); g.rotation.y=face>0?0:Math.PI; world.add(g); return g; }
+function mkCage(x,y,z,tilt){ const g=new THREE.Group();
+  const fr=box(0,0,0,.7,.05,.7,MAT.rust,g); fr.position.y=.95;
+  const fb=box(0,0,0,.7,.05,.7,MAT.rust,g); fb.position.y=.1;
+  for(const [bx,bz] of [[-.32,-.32],[.32,-.32],[-.32,.32],[.32,.32],[0,-.32],[0,.32],[-.32,0],[.32,0]]){ const bar=box(0,0,0,.04,.9,.04,MAT.rust,g); bar.position.set(bx,.52,bz); }
+  const crabM=box(0,0,0,.3,.14,.4,MAT.crab,g); crabM.position.y=.22;
+  const chn=box(0,0,0,.05,4.6-y,.05,MAT.metalD,g); chn.position.y=.95+(4.6-y-.95)/2+.4;
+  g.position.set(x,y,z); g.rotation.z=tilt||0; world.add(g); return g; }
+function mkHood(x,z,face){ const g=new THREE.Group();
+  const bench=box(0,0,0,2.2,.9,1,MAT.metalD,g); bench.position.y=.45;
+  const hood=box(0,0,0,2.2,1.5,.9,MAT.metal,g); hood.position.y=1.75;
+  const mouth=box(0,0,0,1.9,.9,.1,MAT.black,g); mouth.position.set(0,1.5,.42*face);
+  const lamp=box(0,0,0,1.6,.06,.06,MAT.greenlamp,g); lamp.position.set(0,2.2,.4*face);
+  const pipe=box(0,0,0,.3,1.2,.3,MAT.rust,g); pipe.position.y=3;
+  g.position.set(x,0,z); world.add(g); addStatic(x,0,z,2.2,2.5,1,{}); return g; }
 function mkOutlet(x,y,z){ const m=box(x,y,z,.25,.35,.12,MAT.metalD); powerSources.push({pos:new THREE.Vector3(x,y+.2,z),mesh:m,on:true}); return m; }
 function mkGenerator(x,z){ const g=new THREE.Group(); const b=box(0,0,0,1.2,1.1,.8,MAT.rust,g); b.position.y=.55; const pipe=box(0,0,0,.18,1.6,.18,MAT.metalD,g); pipe.position.set(.4,.8,0); g.position.set(x,0,z); world.add(g); addStatic(x,0,z,1.2,1.1,.8,{}); const s={pos:new THREE.Vector3(x,1.2,z),mesh:g,on:false,gen:true,nails:0}; powerSources.push(s); return s; }
 function rebuildArcs(){
@@ -550,6 +749,7 @@ function hurtPlayer(dmg,from,electric){
 function zapvin(){ const z=document.getElementById('zapvin'); z.style.opacity=.9; setTimeout(()=>z.style.opacity=0,110); }
 function die(){ if(G.state!=='play') return; G.state='dead'; if(!QA) document.exitPointerLock&&document.exitPointerLock(); document.getElementById('deadcard').style.display='flex'; }
 function updHUD(){
+  document.getElementById('luckn').textContent=G.charms||0;
   document.getElementById('hpbar').style.width=Math.max(0,G.hp)+'%';
   document.getElementById('absbar').style.width=Math.max(0,G.absorb)+'%';
   const w=curW();
@@ -607,14 +807,17 @@ function playerStep(dt){
 }
 
 // ============================================================ LEVEL KIT
-let lights=[]; let candles=[]; let triggers=[];
+let lights=[]; let candles=[]; let flames=[]; let triggers=[];
 function clearWorld(){
   while(world.children.length) world.remove(world.children[0]);
   while(fxGroup.children.length) fxGroup.remove(fxGroup.children[0]);
-  statics.length=0; props.length=0; enemies=[]; nails=[]; arcs=[]; traps=[]; pickups=[]; inters=[]; npcs=[]; charms=[]; projectiles.length=0; parts.length=0; magPoints.length=0; powerSources.length=0; levelExtraArcs.length=0; lights=[]; candles=[]; triggers=[]; spawnQueue=[]; window.__finale=null;
+  statics.length=0; props.length=0; enemies=[]; nails=[]; arcs=[]; traps=[]; pickups=[]; inters=[]; npcs=[]; charms=[]; projectiles.length=0; parts.length=0; magPoints.length=0; powerSources.length=0; levelExtraArcs.length=0; lights=[]; candles=[]; flames=[]; triggers=[]; spawnQueue=[]; window.__finale=null;
 }
 function ground(w,d,mat=MAT.stoneD){ const g=new THREE.Mesh(new THREE.BoxGeometry(w,1,d),mat); g.position.y=-.5; world.add(g); addStatic(0,-1.01,0,w,1,d,{}); return g; }
-function candle(x,y,z){ const m=box(x,y,z,.07,.22,.07,MAT.candle); candles.push(m); return m; }
+const FLAMEM=new THREE.MeshBasicMaterial({color:0xffb84d});
+function candle(x,y,z){ const m=box(x,y,z,.07,.22,.07,MAT.candle); candles.push(m);
+  const f=new THREE.Mesh(new THREE.ConeGeometry(.032,.13,6),FLAMEM); f.position.set(x,y+.3,z); world.add(f);
+  flames.push({m:f,ox:x,ph:Math.random()*9}); return m; }
 function spawnCharm(x,z){
   const g=new THREE.Group();
   const crate=new THREE.Mesh(new THREE.BoxGeometry(1,1,1),MAT.woodD); crate.position.y=.5; g.add(crate);
@@ -655,7 +858,7 @@ function spawnCharm(x,z){
   koban.rotation.x=Math.PI/2.3; koban.position.set(-.02,1.16,.2); g.add(koban);
   // curled tail
   const tail=new THREE.Mesh(new THREE.TorusGeometry(.09,.032,8,14,4.2),porc); tail.position.set(-.05,1.18,-.12); tail.rotation.set(.4,1.2,0); g.add(tail);
-  const glow=new THREE.PointLight(0xc9962e,2.4,4.5); glow.position.set(0,1.7,0); g.add(glow);
+  const glow=new THREE.PointLight(0xc9962e,3.2,5); glow.position.set(0,1.9,1.1); g.add(glow); // in front, so the face reads
   g.position.set(x,0,z); world.add(g); charms.push({g,got:false});
   return g;
 }
@@ -738,7 +941,7 @@ function npcStep(dt){
 const LEVELS=[
 // ---------- L1 THE TOWN : STREETS
 { act:'ACT I - THE TOWN', name:'STREETS', desc:'The town no one leaves. Find the church. Something in that crashed truck hums with current.',
-  sky:0x1c0f06, fog:[0x241407,18,95], start:[0,0,10], yaw:0,
+  charm:[-5.1,-48], sky:0x1c0f06, fog:[0x241407,18,95], start:[0,0,10], yaw:0,
   build(){
     ground(30,150,MAT.stoneD);
     for(let i=0;i<6;i++){ const z=0-i*22; const h=6+((i*37)%5); building(-11,z,10,14,h, i%2?MAT.plaster:MAT.stone); building(11,z-8,10,16,h-1, i%2?MAT.stone:MAT.plaster); }
@@ -746,10 +949,17 @@ const LEVELS=[
     building(2,-46,3,5,1.6,MAT.rust); // crashed truck
     pickup(2,1.9,-46,'magnet','MAGNET GUN',()=>{ G.weapons.push({...WDEFS[0]}); selectWeapon(G.weapons.length-1); subtitle('SHEPARD','Magnetic. This will do.',4); hint('<span class=kbd>LMB</span> magnetize a surface - metal flies to it. <span class=kbd>RMB</span> repulse blast.',9); objective('Reach the church at the end of the street'); });
     mkFridge(-3,0,-18); mkBarrel(3,0,-22); mkBarrel(2.4,0,-23); mkSawblade(0,0,-34); mkCart(-5,0,-52); mkDumpster(-7,0,-70); mkIBeam(5,0,-64,5); mkTV(4,0,-15); mkChair(-2,0,-12); mkBarrel(-6,0,-85); mkSawblade(6,0,-95); mkFridge(5,0,-100);
+    // v16 dressing: facades, lamps, wires, wrecks, signs, rubble
+    for(let i=0;i<6;i++){ const z=0-i*22; const h=6+((i*37)%5); mkFacade(-11,z,10,14,h,+1); mkFacade(11,z-8,10,16,h-1,-1); }
+    mkStreetlamp(-5,-27,+1,true,.05); mkStreetlamp(5,-59,-1,false,.09); mkStreetlamp(-5,-87,+1,true,.12);
+    mkWire(-5,4.9,-27,-6,5.3,-19,.9); mkWire(-6,5.4,-19,6,5.0,-20,1.3); mkWire(6,5.2,-51,-6,4.9,-52,1.2); mkWire(5,4.9,-59,6,5.1,-64,.8); mkWire(-6,5.2,-83,6,4.8,-84,1.4);
+    mkWreckCar(3.6,-36,.45);
+    mkHangSign(-6,-3,+1); mkHangSign(6,-64,-1);
+    box(-3.5,0,-41,.7,.4,.6,MAT.stoneD).rotation.y=.5; box(5,0,-76,.9,.5,.7,MAT.stoneD).rotation.y=-.3; box(4.4,0,-76.6,.5,.3,.5,MAT.stoneD).rotation.y=.7;
     for(let i=0;i<8;i++){ candle(-4+(i%2)*8,1.1,-14-i*13); }
     pl(0,3,-46,0xff7722,30,18); pl(0,4,-110,0xff9944,40,25); pl(0,4,-10,0xff8830,25,20);
     spawnEnemy('shambler',-3,-26); spawnEnemy('shambler',4,-38); spawnEnemy('shambler',-5,-58);
-    trigger(0,-52,6,()=>{ fogSurge(); queueHorde(['shambler','shambler','shambler','fast'],[[-4,-72],[4,-74],[0,-80]],.8); subtitle('GRIGORI','(distant, carried on the fog) ...my children... come, come...',4); });
+    trigger(0,-52,6,()=>{ fogSurge(); queueHorde(['shambler','shambler','shambler','fast','fast'],[[-4,-72],[4,-74],[0,-80]],.8); subtitle('GRIGORI','(distant, carried on the fog) ...my children... come, come...',4); });
     spawnEnemy('shambler',2,-88); spawnEnemy('fast',-4,-102);
     building(0,-122,14,10,9,MAT.stone); // church
     box(0,0,-117.2,3,4,.3,MAT.woodD);
@@ -761,7 +971,7 @@ const LEVELS=[
   }},
 // ---------- L2 CHURCHYARD
 { act:'ACT I - THE TOWN', name:'CHURCHYARD', desc:'Behind the church, the dead keep their own garden. The hospital waits on the hill.',
-  sky:0x180d05, fog:[0x1e1006,14,80], start:[0,0,8], yaw:0,
+  charm:[-16.5,-63], sky:0x180d05, fog:[0x1e1006,14,80], start:[0,0,8], yaw:0,
   build(){
     ground(60,90,MAT.stoneD);
     building(0,14,16,10,9,MAT.stone);
@@ -770,6 +980,14 @@ const LEVELS=[
     fence(-22,-2,-22,-70); fence(22,-2,22,-70); fence(-22,-70,-8,-70); fence(8,-70,22,-70);
     mkBladeTrap(0,-30);
     mkSawblade(-6,0,-20); mkBarrel(8,0,-26); mkFridge(-12,0,-44); mkCart(10,0,-40); mkIBeam(0,0,-50,6); mkBarrel(-3,0,-55); mkDumpster(14,0,-58);
+    // v16 dressing: crosses, crypt, gallows, mounds, shrubs, entrance arch
+    for(const [cx,cz,cr] of [[-11,-32,.2],[3,-34,-.15],[9,-30,.1],[-4,-40,.25],[12,-44,-.2],[-14,-46,.15],[6,-52,0],[-1,-58,.3]]) mkCrossStone(cx,cz,cr);
+    mkCrypt(-16,-58,.35);
+    mkGallows(14,-36,-.5);
+    mkMound(-7,-44,.15); mkMound(-5.2,-45.5,-.1); mkShovel(-6.4,-44.5,.35); mkMound(10,-54,.2);
+    for(const [sx,sz] of [[-20,-12],[20,-18],[-20,-30],[21,-38],[-19,-52],[20,-60],[-21,-64],[19,-8]]) mkShrub(sx,sz);
+    mkIronArch(0,-4,4.5);
+    candle(-11.4,0,-31.4); candle(-10.6,0,-32.4); candle(14,0,-33.2); candle(3.4,0,-33.5); candle(-14.3,.25,-55.9); candle(-16,.25,-55.2); // crypt step
     for(let i=0;i<10;i++) candle(-16+(i%5)*8,.95,-10-Math.floor(i/5)*30);
     pl(0,4,-30,0xff8830,35,26); pl(0,5,-64,0x66ff88,30,20);
     // hospital gates
@@ -785,7 +1003,7 @@ const LEVELS=[
   }},
 // ---------- L3 THE WARDS
 { act:'ACT II - THE HOSPITAL', name:'THE WARDS', desc:'Sickly green light. Candles in the dark. And a voice that remembers how to be kind.',
-  sky:0x060a06, fog:[0x0a140c,6,55], start:[0,0,5], yaw:0, interior:true,
+  charm:[-7.8,6.5], sky:0x060a06, fog:[0x0a140c,6,55], start:[0,0,5], yaw:0, interior:true,
   build(){
     ground(50,120,MAT.plasterG);
     solidBox(-9,0,-25,1,4,70,MAT.plasterG); solidBox(9,0,-25,1,4,70,MAT.plasterG);
@@ -795,12 +1013,13 @@ const LEVELS=[
     const jm=new THREE.Group(); const tank=new THREE.Mesh(new THREE.CylinderGeometry(.5,.5,1.4,8),new THREE.MeshStandardMaterial({color:0x88aa66,transparent:true,opacity:.5,roughness:.2})); tank.position.y=1.2; jm.add(tank); const base=box(0,0,0,1.2,.5,1.2,MAT.rust,jm); base.position.y=.25; const crabM=box(0,0,0,.3,.15,.4,MAT.crab,jm); crabM.position.y=1.2; jm.position.set(-4,0,4); world.add(jm);
     box(2,0,3,1.6,.9,1,MAT.metalD);
     const pot=new THREE.Mesh(new THREE.CylinderGeometry(.35,.35,.3,8),MAT.black); pot.position.set(2,1.05,3); world.add(pot);
-    candle(-5.5,1,6); candle(5.5,1,0); candle(-5.5,1,-4);
+    candle(-5.5,.01,6); candle(5.5,.01,0); candle(-5.5,.01,-4);
     pl(0,2.6,2,0x66ff88,18,14); pl(-4,1.8,4,0x88ff66,10,8);
     const gr=mkGrigori(-2,2,0);
     setTimeout(()=>subtitle('GRIGORI','I confess, I am gladdened by your company. Too much solitude is not good for a man who wishes only to serve.',6),2500);
     setTimeout(()=>{ subtitle('GRIGORI','The serum steadies me. The blood of the crab is a bitter communion. Pay no mind to the machine.',6); },9000);
     setTimeout(()=>{ subtitle('GRIGORI','They come. They ALWAYS come. Quick - the wards. Stay near your Father.',5); barricadeBreak(); },15000);
+    pl(0,2.2,-7.2,0xff9944,16,12); // warm spill so the barricade reads
     const barMesh=solidBox(0,0,-10,16,2.6,.4,MAT.wood);
     const bar=statics[statics.length-1];
     function barricadeBreak(){
@@ -813,8 +1032,28 @@ const LEVELS=[
     mkCart(3,0,-18);
     pickup(3,1.1,-18,'nailgun','NAIL GUN',()=>{ G.weapons.push({...WDEFS[1]}); subtitle('GRIGORI','The nails remember the current. Lay them as a path and the power will walk it.',6); hint('<span class=kbd>LMB</span> nails stick to walls and floors - chain them near a sparking outlet to carry the arc.',9); });
     mkCart(-4,0,-26); mkChair(4,0,-30); mkTV(-5,0,-36); mkBarrel(5,0,-42); mkFridge(-6,0,-46); mkSawblade(2,0,-34);
+    mkGurney(-6.9,-15,.12); mkGurney(6.9,-21,-.1); mkGurney(-6.9,-33,.06); mkGurney(6.9,-43,-.14); mkGurney(-6.9,-52,.1);
+    mkCurtain(2.5,-24); mkCurtain(-3,-38);
+    for(let i=0;i<4;i++){ const dz=-16-i*11; box(-8.42,0,dz,.25,3,1.8,MAT.woodD); box(-8.42,3,dz,.3,.3,2.1,MAT.woodD); box(8.42,0,dz-5.5,.25,3,1.8,MAT.woodD); box(8.42,3,dz-5.5,.3,.3,2.1,MAT.woodD); }
+    box(8.5,2.4,-20,.18,.3,.3,MAT.greenlamp); box(8.5,2.4,-44,.18,.3,.3,MAT.greenlamp);
+    pl(7,2.4,-20,0x44cc66,10,11); pl(7,2.4,-44,0x44cc66,10,11);
+    // v19 dressing: wainscot, ceiling pipes, signage, chalkboard, floor papers
+    box(-8.47,0,-25,.07,1.15,68,MAT.woodD); box(8.47,0,-25,.07,1.15,68,MAT.woodD);
+    box(-8.44,0,-25,.05,.2,68,MAT.black); box(8.44,0,-25,.05,.2,68,MAT.black);
+    pipe(-3.2,3.52,-25,66,'z'); pipe(3.2,3.52,-25,66,'z'); pipe(0,3.74,-25,64,'z',.045);
+    for(let i=0;i<5;i++) pipe(0,3.62,-8-i*12,6.4,'x',.045);
+    pipe(8.35,2.95,-20,1.2,'y'); pipe(8.35,2.95,-44,1.2,'y'); pipe(8.35,2.35,-30,2.4,'y'); valve(8.35,2.2,-30);
+    stain(8.44,1.5,-20,1.8,-Math.PI/2); stain(8.44,1.5,-44,1.8,-Math.PI/2); stain(8.44,1.2,-30,2.2,-Math.PI/2);
+    plaque(0,2.75,11.42,'WARD TWO',Math.PI,'ST. VERAN INFIRMARY');
+    plaque(-8.44,2.35,-24,'QUIET',Math.PI/2,'THE FATHER LISTENS');
+    plaque(8.44,2.35,-38,'ISOLATION',-Math.PI/2);
+    plaque(0,3.02,-57.42,'WARD THREE',0);
+    box(-5.44,1.25,2,.05,1.42,2.76,MAT.woodD); box(-5.40,1.3,2,.05,1.3,2.6,MAT.black);
+    mkChair(-3,0,4.5); mkChair(.5,0,5.5);
+    for(let i=0;i<12;i++){ const p=new THREE.Mesh(new THREE.PlaneGeometry(.28,.36),MAT.sheet); p.rotation.x=-Math.PI/2; p.rotation.z=rnd()*6.28; p.position.set(-7+rnd()*14,.012+i*.0012,-10-rnd()*46); world.add(p); }
+    spawnEnemy('shambler',4,-44); spawnEnemy('fast',-5,-52);
     mkOutlet(8.4,1.2,-30);
-    for(let i=0;i<6;i++) candle(-8,1,-12-i*8);
+    for(let i=0;i<6;i++) candle(-8,.01,-12-i*8);
     pl(0,3,-30,0x55dd77,22,30); pl(0,3,-52,0xff8830,15,16);
     // power door puzzle
     solidBox(-5.5,0,-58,7,4,1,MAT.plasterG); solidBox(5.5,0,-58,7,4,1,MAT.plasterG);
@@ -831,7 +1070,7 @@ const LEVELS=[
   }},
 // ---------- L4 HYDROTHERAPY
 { act:'ACT II - THE HOSPITAL', name:'HYDROTHERAPY', desc:'Tiled pools, rusted gurneys, standing water. Water remembers the current too.',
-  sky:0x05090a, fog:[0x081210,7,60], start:[0,0,10], yaw:0, interior:true,
+  charm:[12.4,-50.5], sky:0x05090a, fog:[0x081210,7,60], start:[0,0,10], yaw:0, interior:true,
   build(){
     ground(60,80,MAT.plasterG);
     solidBox(-14,0,-20,1,4.5,70,MAT.plasterG); solidBox(14,0,-20,1,4.5,70,MAT.plasterG);
@@ -857,9 +1096,25 @@ const LEVELS=[
     });
     setInterval(()=>{ if(G.levelIndex!==3)return; for(const a of levelExtraArcs){ if(!a.pool) continue; a.active = arcs.some(x=>x.active && x!==a && (distPointSeg(a.a,x.a,x.b)<2||distPointSeg(a.b,x.a,x.b)<2)); } },500);
     mkCart(-10,0,-38); mkFridge(10,0,-40); mkBarrel(0,0,-36); mkSawblade(-6,0,-44); mkIBeam(4,0,-10,4);
-    for(let i=0;i<8;i++) candle(-12+(i%2)*24,1,-6-i*6);
-    pl(0,3.4,-8,0x66ff88,20,24); pl(0,3.4,-34,0x55dd77,20,24); pl(0,3,-48,0xff8830,14,14);
+    mkGurney(-11,-24,.2); mkGurney(11.2,-13,-.15); mkGurney(3,0-49,0); 
+    for(let i=0;i<8;i++) candle(-12+(i%2)*24,.01,-6-i*6);
+    pl(0,3.4,-8,0x66ff88,20,24); pl(0,3.4,-21,0x4fc46a,15,20); pl(0,3.4,-34,0x55dd77,20,24); pl(0,3,-48,0xff8830,14,14);
     setTimeout(()=>{ if(G.levelIndex!==3)return; subtitle('GRIGORI','(clutching his neck) The blood sings today. Forgive me if I... ramble.',5); },30000);
+    // v19 dressing: tile wainscot, pool ladders, pipe grid, lockers, benches, drains, puddles, signage
+    box(-13.44,0,-20,.08,2,68,tileM); box(13.44,0,-20,.08,2,68,tileM);
+    box(0,0,13.44,28,2,.08,tileM); box(0,0,-53.44,28,2,.08,tileM);
+    box(-13.42,2,-20,.12,.14,68,MAT.plasterG); box(13.42,2,-20,.12,.14,68,MAT.plasterG);
+    box(0,2,13.42,28,.14,.12,MAT.plasterG); box(0,2,-53.42,28,.14,.12,MAT.plasterG);
+    for(const [lx,lz] of [[-3.6,-8],[3.6,-8],[-3.6,-26],[3.6,-26]]) mkLadder(lx,lz,Math.PI/2);
+    pipe(0,3.9,-17,26,'x',.08); pipe(12.9,3.7,-20,64,'z'); pipe(-12.9,3.7,-20,64,'z');
+    for(const [px,pz] of [[-10,-8],[10,-8],[-10,-26],[10,-26]]){ pipe(px,2.4,pz,3,'y'); valve(px+(px>0?-.12:.12),1.75,pz); }
+    stain(-13.44,2.6,-17,2.6,Math.PI/2); stain(13.44,2.6,-17,2.6,-Math.PI/2); stain(-13.44,1.4,-40,1.8,Math.PI/2); stain(13.44,1.4,-6,1.8,-Math.PI/2);
+    mkLocker(13.2,7); mkLocker(13.2,4.4);
+    mkBench(-13,6,Math.PI/2); mkBench(-13,-2,Math.PI/2);
+    mkDrain(0,-4); mkDrain(0,-22); mkDrain(0,-40); mkDrain(-11,-17); mkDrain(11,-33); mkDrain(5,-46);
+    puddle(-4,-13,.9); puddle(4.5,-14,.7); puddle(-4.5,-31,.8); puddle(4,-33,.65); puddle(0,-12,.6); puddle(-2,-45,.75);
+    plaque(0,3.15,13.4,'HYDROTHERAPY',Math.PI,'EST. 1911');
+    plaque(-13.44,2.5,-17,'POOLS 1 - 4',Math.PI/2);
     const exdMesh=solidBox(0,0,-53.5,4,3.4,.5,MAT.metalD,{metal:true});
     const exd=statics[statics.length-1];
     let exOpen=false;
@@ -869,7 +1124,7 @@ const LEVELS=[
   }},
 // ---------- L5 THE LABS
 { act:'ACT II - THE HOSPITAL', name:'THE LABS', desc:'Where the serum was born. Cages, chemical hoods, and chattering in the vents.',
-  sky:0x070605, fog:[0x0c0a06,7,55], start:[0,0,10], yaw:0, interior:true,
+  charm:[-14,-44], sky:0x070605, fog:[0x0c0a06,7,55], start:[0,0,10], yaw:0, interior:true,
   build(){
     ground(70,80,MAT.stoneD);
     solidBox(-16,0,-20,1,4.5,70,MAT.plaster); solidBox(16,0,-20,1,4.5,70,MAT.plaster);
@@ -891,24 +1146,51 @@ const LEVELS=[
     box(0,3.6,-53.2,3,.5,.2,MAT.greenlamp);
     spawnEnemy('acid',-10,-44); spawnEnemy('shambler',6,-42); spawnEnemy('fast',-4,-46);
     setTimeout(()=>{ if(G.levelIndex===4) queueHorde(['shambler','fast','acid','shambler'],[[-12,-50],[12,-50]],1); },45000);
+    for(let i=0;i<3;i++){ const jm=new THREE.Group(); const tank=new THREE.Mesh(new THREE.CylinderGeometry(.45,.45,1.3,8),new THREE.MeshStandardMaterial({color:0x88aa66,transparent:true,opacity:.5,roughness:.2})); tank.position.y=1.1; jm.add(tank); const bs=box(0,0,0,1,.45,1,MAT.rust,jm); bs.position.y=.22; const cr=box(0,0,0,.28,.14,.36,MAT.crab,jm); cr.position.y=1.1; jm.position.set(4+i*3.2,0,-14); world.add(jm); }
+    mkCage(-6,2.1,-26,.06); mkCage(3,1.8,-30,-.05); mkCage(-2,2.3,-36,.04); mkCage(8,2.0,-22,-.07); mkCage(-9,1.9,-33,.03);
+    mkHood(-14.8,-12,1); mkHood(-14.8,-24,1); mkHood(14.8,-18,-1); mkHood(14.8,-30,-1);
+    box(0,3.8,-14,.9,.5,.14,MAT.black); box(0,3.8,-30,.9,.5,.14,MAT.black); // vent grates on the divider
+    trigger(0,-20,7,()=>{ spark(new THREE.Vector3(0,3.4,-14),0x9a9088,10); spark(new THREE.Vector3(0,3.4,-30),0x9a9088,10); spawnEnemy('crab',-1,-16); spawnEnemy('crab',1,-17); spawnEnemy('crab',0,-28); subtitle('','Chittering in the vents.',2); sfx('groan'); });
     mkCart(6,0,-14); mkFridge(-12,0,-18); mkBarrel(10,0,-22); mkSawblade(0,0,-28); mkTV(4,0,-38); mkIBeam(-6,0,-34,5); mkChair(12,0,-16); mkChair(11,0,-18);
-    for(let i=0;i<10;i++) candle(-14+(i%3)*14,1,-8-i*4.4);
-    pl(0,3.4,-10,0x88ff66,18,20); pl(-13,2.5,-40,0xff8830,16,14); pl(13,2.5,-40,0xff8830,16,14); pl(0,3,-30,0x66ff88,14,20);
+    for(let i=0;i<10;i++) candle(-14+(i%3)*14,.01,-8-i*4.4);
+    pl(0,3.4,-10,0x88ff66,22,24); pl(-13,2.5,-40,0xff8830,18,16); pl(13,2.5,-40,0xff8830,18,16); pl(0,3,-30,0x66ff88,18,24); pl(0,3,4,0x66ff88,10,14); pl(0,3.2,-47,0x88ff66,12,16);
     setTimeout(()=>{ if(G.levelIndex!==4)return; subtitle('GRIGORI','(voice cracking) The hood hides what the blood makes of me. Do not look at your Father too closely, child.',6); },24000);
     trigger(0,-52,2.5,()=>{ if(powered===2) nextLevel(); },false);
+    // v20 dressing: power conduits, lab tables, jar shelves, signage, vents, stains, case files
+    pipe(13,2.7,-36,2.5,'y'); pipe(-13,2.7,-36,2.5,'y'); // outlet risers
+    pipe(13,3.95,-44.5,17,'z',.05); pipe(-13,3.95,-44.5,17,'z',.05); // ceiling runs to the lift wall
+    pipe(6.5,3.9,-52.6,13,'x',.05); pipe(-6.5,3.9,-52.6,13,'x',.05);
+    pipe(13,1,-38.4,1.6,'y',.08); pipe(-13,1,-38.4,1.6,'y',.08); // generator feeds
+    pipe(13,1.9,-40.4,1.8,'z',.08); pipe(-13,1.9,-40.4,1.8,'z',.08);
+    box(15.42,1.1,-44,.14,.5,.5,MAT.metalD); box(-15.42,1.1,-44,.14,.5,.5,MAT.metalD); // junction boxes
+    mkLabTable(-13.2,-18); mkLabTable(-13.2,-21.5); mkLabTable(13.2,-13); mkLabTable(13.2,-24.5);
+    mkShelf(-15.3,-8,Math.PI/2); mkShelf(15.3,-36,-Math.PI/2);
+    plaque(0,3.1,13.42,'LABORATORY',Math.PI,'SERUM RESEARCH - AUTHORIZED STAFF');
+    plaque(15.44,2.4,-20,'EAST WING',-Math.PI/2); plaque(-15.44,2.4,-20,'WEST WING',Math.PI/2);
+    plaque(0,3.02,-53.42,'CHAPEL LIFT',0);
+    plaque(.56,2.2,-16,'DO NOT FEED',Math.PI/2);
+    box(15.44,3.3,-8,.14,.5,.9,MAT.black); box(-15.44,3.3,-8,.14,.5,.9,MAT.black); box(15.44,3.3,-44,.14,.5,.9,MAT.black); box(-15.44,3.3,-44,.14,.5,.9,MAT.black); // wall vents
+    bloodStain(-6,-25.4,.6); bloodStain(3.2,-29.4,.75); bloodStain(-2,-35.4,.5); bloodStain(-8.6,-32.6,.55);
+    mkDrain(0,-6); mkDrain(-7,-24); mkDrain(7,-32); mkDrain(0,-46);
+    for(let i=0;i<10;i++){ const p=new THREE.Mesh(new THREE.PlaneGeometry(.28,.36),MAT.sheet); p.rotation.x=-Math.PI/2; p.rotation.z=rnd()*6.28; p.position.set(-12+rnd()*24,.012+i*.0012,-6-rnd()*42); world.add(p); }
     objective('Restore power to the East and West wings');
   }},
 // ---------- L6 THE MINISTER
 { act:'ACT III', name:'THE MINISTER', desc:'The chapel above the labs. What Grigori has become waits in candlelight, and the choice is yours.',
-  sky:0x0a0503, fog:[0x120806,8,60], start:[0,0,12], yaw:0, interior:true,
+  charm:[7.5,-41.5], sky:0x0a0503, fog:[0x120806,8,60], start:[0,0,12], yaw:0, interior:true,
   build(){
     ground(44,70,MAT.stoneD);
     solidBox(-10,0,-14,1,6,60,MAT.stone); solidBox(10,0,-14,1,6,60,MAT.stone);
     solidBox(0,0,16,22,6,1,MAT.stone); solidBox(0,0,-44,22,6,1,MAT.stone);
     for(let i=0;i<4;i++){ solidBox(-4.5,0,-8-i*5,5,.9,1,MAT.woodD); solidBox(4.5,0,-8-i*5,5,.9,1,MAT.woodD); }
     solidBox(0,0,-38,6,1.1,2.4,MAT.stone);
-    for(let i=0;i<14;i++) candle(-8+(i%7)*2.6,1.15,-36-Math.floor(i/7)*2);
-    for(let i=0;i<8;i++) candle(-8.5,1,-4-i*4);
+    stainedGlass(0,2.1,-43.38,4.2,3.4); pl(0,4.4,-41.5,0xcc6633,18,16);
+    box(0,1.06,-37.1,5.6,.5,.06,MAT.cloth); // altar cloth
+    box(0,1.1,-38,0.14,1.5,.14,MAT.rust); box(0,1.85,-38,.7,.13,.13,MAT.rust); // iron cross
+    chandelier(0,3.4,-14); chandelier(0,3.4,-26);
+    banner(-9.4,-30,1); banner(9.4,-30,-1); banner(-9.4,-10,1); banner(9.4,-10,-1);
+    for(const [cx2,cz2,cy2] of [[-8,-36,.01],[-5.4,-36,.01],[5,-36,.01],[7.6,-36,.01],[-8,-38,.01],[-5.4,-38,.01],[5,-38,.01],[7.6,-38,.01],[-2.8,-38,1.13],[-.2,-38,1.13],[2.4,-38,1.13]]) candle(cx2,cy2,cz2); // floor votives flank the altar, three on the altar top
+    for(let i=0;i<8;i++) candle(-8.5,.01,-4-i*4);
     pl(0,4,-34,0xff8830,40,26); pl(0,5,-12,0xff7730,25,24); pl(0,3,-40,0x66ff66,14,10);
     // containment cell: three walls + powered door, open side faces -x
     solidBox(9.5,0,-34,1,4,6,MAT.metalD,{metal:true,cond:true});
@@ -937,6 +1219,17 @@ const LEVELS=[
     document.getElementById('bkill').onclick=()=>{ mode='kill'; startChoice(); objective('End it.'); hint('Everything you have. Metal, nails, current. He feels all of it now.',8); };
     function startChoice(){ document.getElementById('choice').style.display='none'; G.state='play'; if(!QA) canvas.requestPointerLock(); }
     window.__finale={get mode(){return mode},syr,bossE,cureN:0,cellPos:new THREE.Vector3(7,0,-34)};
+    window.__finale.sermon=(n)=>{
+      cameraShake(.7); fogSurge(); sfx('groan'); waves('THE SERMON');
+      setTimeout(()=>{ if(G.levelIndex===5) waves(''); },6000);
+      if(n===1){
+        subtitle('GRIGORI','(the hymn splits into two voices) COME, LITTLE ONES - ...stay back, Shephard, STAY BACK - ...COME AND KEEP YOUR FATHER.',6);
+        queueHorde(['shambler','shambler','crab'],[[-8,-16],[8,-16],[0,-12]],.9);
+      } else {
+        subtitle('GRIGORI','(two voices) HE STANDS AT THE ALTAR, CHILDREN - ...the candles, mind the candles - ...TEAR HIM GENTLY.',6);
+        queueHorde(['fast','crab','shambler','crab'],[[8,-16],[-8,-16],[0,-24],[-8,-22]],.8);
+      }
+    };
     levelExtraArcs.push({a:new THREE.Vector3(4,1,-33),b:new THREE.Vector3(4,1,-35),active:false,t:0,cellDoor:true});
     setInterval(()=>{ if(G.levelIndex!==5)return; for(const a of levelExtraArcs){ if(a.cellDoor) a.active=arcs.some(x=>x.active&&x!==a&&distPointSeg(new THREE.Vector3(4.4,1,-34),x.a,x.b)<2.5); } },400);
     objective('Face the Minister');
@@ -946,6 +1239,12 @@ function finaleStep(dt){
   const F=window.__finale; if(!F||G.levelIndex!==5||G.state!=='play') return;
   const b=F.bossE;
   if(F.mode==='kill' && b.hp<=0){ endGame('kill'); return; }
+  if(b.hp>0 && F.sermon){
+    const frac=b.hp/b.T.hp;
+    if(!F.ph1 && frac<.66){ F.ph1=true; F.sermon(1); }
+    if(!F.ph2 && frac<.33){ F.ph2=true; F.sermon(2); }
+    b.enrage=frac<.22;
+  }
   if(b.hp<=0) return;
   if(F.mode==='cure'){
     for(const s of F.syr){ if(!s.used&&PLAYER.pos.distanceTo(s.pos)<1.6){ s.used=true; F.cureN++; sfx('pickup'); spark(s.pos,0x66ff88,14); objective(`Serum synthesized: ${F.cureN}/3`); } }
@@ -996,13 +1295,15 @@ function startLevel(i){
   document.getElementById('title').style.display='none';
   document.getElementById('deadcard').style.display='none';
   L.build();
-  spawnCharm(L.start[0]+(L.start[0]>2?-3.2:3.2), L.start[2]-4);
+  const chx=L.charm?L.charm[0]:L.start[0]+(L.start[0]>2?-3.2:3.2), chz=L.charm?L.charm[1]:L.start[2]-4;
+  const chg=spawnCharm(chx,chz); chg.rotation.y=Math.atan2(L.start[0]-chx, L.start[2]-chz); // face the approach
   updHUD(); waves('');
   G.state='play';
   const hemi=new THREE.HemisphereLight(L.interior?0x4a6a54:0x7a5a3a, 0x0e0c08, L.interior?1.45:1.3);
   world.add(hemi);
   const dir=new THREE.DirectionalLight(L.interior?0x88aa88:0xff8844, L.interior?.65:1.1);
   if(L.interior) world.add(new THREE.AmbientLight(0x1c2a22,.55));
+  if(!L.interior){ const moon=new THREE.DirectionalLight(0x8a94c0,.32); moon.position.set(-15,30,-18); world.add(moon); } // cool fill so silhouettes read
   dir.position.set(18,40,12); world.add(dir);
   document.getElementById('fade').style.opacity=0;
   if(!QA) canvas.requestPointerLock();
@@ -1023,7 +1324,8 @@ document.getElementById('endgo').onclick=()=>location.reload();
 const clock=new THREE.Clock();
 function loop(){
   requestAnimationFrame(loop);
-  const dt=Math.min(clock.getDelta(),.05);
+  let dt=Math.min(clock.getDelta(),.05);
+  if(G.hitstop>0){ G.hitstop-=dt; dt*=.12; }
   G.time+=dt;
   if(G.state==='play'){
     levelTime+=dt;
@@ -1044,8 +1346,16 @@ function loop(){
     if(G.time-G.lastHurt>6 && G.hp<100 && G.hp>0){ G.hp=Math.min(100,G.hp+2.5*dt); updHUD(); }
     // candle flicker
     MAT.candle.emissiveIntensity=2.1+Math.sin(G.time*13)*.35+Math.sin(G.time*31)*.15;
+    for(const f of flames){ f.m.scale.y=1+Math.sin(G.time*13+f.ph)*.3+Math.sin(G.time*29+f.ph*2)*.12; f.m.scale.x=f.m.scale.z=1-Math.sin(G.time*13+f.ph)*.14; f.m.position.x=f.ox+Math.sin(G.time*7+f.ph)*.009; }
+    // boss bar
+    const bb=enemies.find(e=>e.boss);
+    const bel=document.getElementById('bossbar');
+    if(bb && !(bb.dead>0)){ bel.style.display='block'; document.getElementById('bossfill').style.width=Math.max(0,bb.hp/bb.T.hp*100)+'%'; }
+    else if(bel.style.display==='block'){ bel.style.display='none'; }
   }
   muzzleStep(dt);
+  hitLStep(dt);
+  hitmarkStep(dt);
   fxStep(dt);
   renderer.render(scene,camera);
 }
@@ -1067,7 +1377,51 @@ if(QA){
   if(qf){ for(let i=0;i<qf;i++){ const dt=1/60; G.time+=dt; levelTime+=dt; if(G.state==='play'){ playerStep(dt); enemyStep(dt); physStep(dt); projStep(dt); arcStep(dt); trapStep(dt); spawnStep(dt); triggerStep(); npcStep(dt); finaleStep(dt); fogStep(dt); ambientStep(dt); charmStep(dt); } } }
   if(qt.startsWith('pick:')){ const btn={cure:'bcure',contain:'bcontain',kill:'bkill'}[qt.slice(5)]; setTimeout(()=>{ document.getElementById(btn).onclick(); for(let i=0;i<(+(qs.get("bake2")||700));i++){ const dt=1/60; G.time+=dt; levelTime+=dt; if(G.state==='play'){ playerStep(dt); enemyStep(dt); physStep(dt); projStep(dt); arcStep(dt); trapStep(dt); spawnStep(dt); triggerStep(); npcStep(dt); finaleStep(dt); fogStep(dt); ambientStep(dt); charmStep(dt); } } },9650); }
   if(qt==='choice'){ document.getElementById('choice').style.display='flex'; G.state='choice'; }
+  if(qt==='hit'){ window.__hitok=true; const e=spawnEnemy('shambler',PLAYER.pos.x,PLAYER.pos.z-4.5); damageEnemy(e,25); e.pop=1; e.mesh.scale.setScalar(1.16); if(hitL){ hitL.position.copy(e.mesh.position); hitL.position.y+=1.2; hitL.intensity=30; } window.__hitfreeze=true; hitmark(); hitmarkT=9; }
   if(qt==='charm' && charms.length){ const c=charms[0].g.position; PLAYER.pos.set(c.x,1.62-PLAYER.eye,c.z+1.7); G.yaw=0; G.pitch=-.1; }
+  if(qt==='gauntlet'){ // scripted-fire wave sim: auto-aim + infinite ammo, advance toward contacts
+    if(!G.weapons.length) G.weapons.push({...WDEFS[0]},{...WDEFS[1]},{...WDEFS[2]});
+    const GUN=Math.max(0,Math.min(+(qs.get('gun')||1), G.weapons.length-1));
+    const SYNC=qs.get('sync')==='1'; // qa: fully synchronous loop - blocks page load until the sim finishes so --dump-dom sees the result
+    selectWeapon(GUN);
+    let spawned=enemies.length; const _se=spawnEnemy; spawnEnemy=(...args)=>{ spawned++; return _se(...args); };
+    let frames=0, minHp=100, quiet=0;
+    const MAXF=60*240;
+    const step=(dt)=>{
+      G.time+=dt; levelTime+=dt; frames++;
+      if(G.state!=='play') return false;
+      G.weapons.forEach(w=>w.ammo=Infinity);
+      let ne=null, nd=1e9;
+      for(const e of enemies){ if(!(e.dead>0)){ const d=e.mesh.position.distanceToSquared(PLAYER.pos); if(d<nd){nd=d;ne=e;} } }
+      if(ne && nd<256){ // within 16m: stand and fight
+        quiet=0;
+        const tgt=ne.mesh.position.clone(); tgt.y+=1.1;
+        const o=eyePos(); const dv=tgt.sub(o);
+        G.yaw=Math.atan2(-dv.x,-dv.z); G.pitch=Math.max(-.6,Math.min(.6,Math.atan2(dv.y,Math.hypot(dv.x,dv.z))));
+        firing=true;
+      } else {
+        firing=false; quiet++;
+        PLAYER.vel.x=0; PLAYER.vel.z=0;
+        if(ne){ const ep=ne.mesh.position; const dx=ep.x-PLAYER.pos.x, dz=ep.z-PLAYER.pos.z, dl=Math.hypot(dx,dz)||1;
+          PLAYER.pos.x+=dx/dl*2.4*dt; PLAYER.pos.z+=dz/dl*2.4*dt; }
+        else PLAYER.pos.z-=2.4*dt;
+      }
+      playerStep(dt); enemyStep(dt); physStep(dt); projStep(dt); arcStep(dt); trapStep(dt); spawnStep(dt); triggerStep(); npcStep(dt); finaleStep(dt); fogStep(dt); ambientStep(dt); charmStep(dt);
+      if(G.hp<minHp) minHp=G.hp;
+      return true;
+    };
+    (async()=>{
+      while(frames<MAXF){
+        if(!step(1/60)) break;
+        if(!SYNC && frames%180===0) await new Promise(r=>setTimeout(r,0)); // let real timers (scripted spawns) fire
+        if(quiet>600 && spawnQueue.length===0 && enemies.length===0) break;
+        if(quiet>1800) break; // no contact for 30s - stuck or cleared
+      }
+      const kills=spawned-enemies.length;
+      document.title='GAUNTLET L'+G.levelIndex+' gun='+GUN+' t='+(frames/60).toFixed(0)+'s kills='+kills+'/'+spawned+' minHp='+Math.round(minHp)+' hp='+Math.round(G.hp)+' state='+G.state+' z='+PLAYER.pos.z.toFixed(0);
+    })();
+  }
+  if(qt==='sermon'){ setTimeout(()=>{ document.getElementById('bkill').onclick(); const F=window.__finale; F.bossE.hp=560; G.weapons.push({...WDEFS[1]}); for(let i=0;i<(+(qs.get("bake2")||300));i++){ const dt=1/60; G.time+=dt; levelTime+=dt; if(G.state==='play'){ playerStep(dt); enemyStep(dt); physStep(dt); projStep(dt); arcStep(dt); trapStep(dt); spawnStep(dt); triggerStep(); npcStep(dt); finaleStep(dt); fogStep(dt); ambientStep(dt); charmStep(dt); } } document.title='SERMON enemies='+enemies.length+' bossHp='+Math.round(F.bossE.hp)+' ph1='+!!F.ph1+' ph2='+!!F.ph2; },9750); }
   if(qt.startsWith('end:')){ endGame(qt.slice(4)); }
 }
 loop();
